@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:camera/camera.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'services/camera_service.dart';
+
 
 class NewVisitScreen extends StatefulWidget {
   const NewVisitScreen({super.key});
@@ -13,16 +15,16 @@ class NewVisitScreen extends StatefulWidget {
 }
 
 class _NewVisitScreenState extends State<NewVisitScreen> {
+  final _formKey = GlobalKey<FormState>();
   final TextEditingController _associateNameController = TextEditingController();
+  final TextEditingController _reraNumberController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _timeController = TextEditingController();
   
-  CameraController? _cameraController;
-  XFile? _capturedImage;
-  bool _isCameraInitialized = false;
+  String? _photoUrl;
   bool _isLoadingLocation = false;
-  String _currentLocation = '';
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -34,10 +36,10 @@ class _NewVisitScreenState extends State<NewVisitScreen> {
   @override
   void dispose() {
     _associateNameController.dispose();
+    _reraNumberController.dispose();
     _locationController.dispose();
     _dateController.dispose();
     _timeController.dispose();
-    _cameraController?.dispose();
     super.dispose();
   }
 
@@ -50,422 +52,419 @@ class _NewVisitScreenState extends State<NewVisitScreen> {
   Future<void> _getCurrentLocation() async {
     setState(() {
       _isLoadingLocation = true;
+      _locationController.text = 'Automatically detecting your current location...';
     });
 
     try {
-      // Check location permission
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-
-      if (permission == LocationPermission.deniedForever) {
+      // Request location permission
+      final locationPermission = await Permission.location.request();
+      if (locationPermission != PermissionStatus.granted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Location permission is required for accurate location detection')),
+        );
         setState(() {
-          _locationController.text = 'Location permission denied';
           _isLoadingLocation = false;
+          _locationController.text = '';
         });
         return;
       }
 
-      // Get current position
+      // Check if location services are enabled
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Please enable location services')),
+        );
+        setState(() {
+          _isLoadingLocation = false;
+          _locationController.text = '';
+        });
+        return;
+      }
+
+      // Get current position with high accuracy
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 10),
       );
 
-      // Get address from coordinates
+      // Get detailed address from coordinates
       List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
+        position.latitude, 
         position.longitude,
       );
 
       if (placemarks.isNotEmpty) {
         Placemark place = placemarks[0];
-        String address = "${place.street}, ${place.locality}, ${place.administrativeArea}, ${place.country}";
+        String address = '';
+        
+        // Build detailed address
+        if (place.subThoroughfare != null && place.subThoroughfare!.isNotEmpty) {
+          address += '${place.subThoroughfare} ';
+        }
+        if (place.thoroughfare != null && place.thoroughfare!.isNotEmpty) {
+          address += '${place.thoroughfare}, ';
+        }
+        if (place.subLocality != null && place.subLocality!.isNotEmpty) {
+          address += '${place.subLocality}, ';
+        }
+        if (place.locality != null && place.locality!.isNotEmpty) {
+          address += '${place.locality}, ';
+        }
+        if (place.subAdministrativeArea != null && place.subAdministrativeArea!.isNotEmpty) {
+          address += '${place.subAdministrativeArea}, ';
+        }
+        if (place.administrativeArea != null && place.administrativeArea!.isNotEmpty) {
+          address += '${place.administrativeArea}, ';
+        }
+        if (place.postalCode != null && place.postalCode!.isNotEmpty) {
+          address += '${place.postalCode}, ';
+        }
+        if (place.country != null && place.country!.isNotEmpty) {
+          address += place.country!;
+        }
+        
+        // Remove trailing comma and space
+        if (address.endsWith(', ')) {
+          address = address.substring(0, address.length - 2);
+        }
+        
+        // Add coordinates for precision
+        String preciseLocation = '$address\n(${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)})';
+        
         setState(() {
-          _locationController.text = address;
-          _currentLocation = address;
+          _locationController.text = preciseLocation;
+          _isLoadingLocation = false;
         });
+        
+        print('Precise location detected: $preciseLocation');
+        print('Accuracy: ${position.accuracy} meters');
       }
     } catch (e) {
-      setState(() {
-        _locationController.text = 'Unable to fetch location';
-      });
-      print('Error getting location: $e');
-    } finally {
+      print('Error getting precise location: $e');
       setState(() {
         _isLoadingLocation = false;
+        _locationController.text = '';
       });
-    }
-  }
-
-  Future<void> _initializeCamera() async {
-    try {
-      // Request camera permission
-      final cameraPermission = await Permission.camera.request();
-      if (cameraPermission != PermissionStatus.granted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Camera permission is required')),
-        );
-        return;
-      }
-
-      // Get available cameras
-      final cameras = await availableCameras();
-      
-      // Find front camera
-      CameraDescription? frontCamera;
-      for (CameraDescription camera in cameras) {
-        if (camera.lensDirection == CameraLensDirection.front) {
-          frontCamera = camera;
-          break;
-        }
-      }
-
-      if (frontCamera == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Front camera not available')),
-        );
-        return;
-      }
-
-      // Initialize camera controller
-      _cameraController = CameraController(
-        frontCamera,
-        ResolutionPreset.medium,
-      );
-
-      await _cameraController!.initialize();
-      
-      setState(() {
-        _isCameraInitialized = true;
-      });
-    } catch (e) {
-      print('Error initializing camera: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to initialize camera')),
+        SnackBar(
+          content: Text('Failed to get precise location. Please check your GPS and internet connection.'),
+          duration: Duration(seconds: 3),
+        ),
       );
     }
   }
 
   Future<void> _takePicture() async {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('User not authenticated')),
+      );
       return;
     }
+
+    // Generate a temporary visit ID for the photo
+    final tempVisitId = DateTime.now().millisecondsSinceEpoch.toString();
 
     try {
-      final XFile image = await _cameraController!.takePicture();
-      setState(() {
-        _capturedImage = image;
-        _isCameraInitialized = false;
-      });
-      _cameraController?.dispose();
-      _cameraController = null;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CameraScreen(
+            userId: currentUser.uid,
+            visitId: tempVisitId,
+            onPhotoTaken: (photoUrl) {
+              setState(() {
+                _photoUrl = photoUrl;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Photo captured successfully!'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+          ),
+        ),
+      );
     } catch (e) {
-      print('Error taking picture: $e');
+      print('Error opening camera: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to take picture')),
+        const SnackBar(content: Text('Failed to open camera')),
       );
     }
   }
 
-  void _retakePicture() {
-    setState(() {
-      _capturedImage = null;
-    });
-    _initializeCamera();
-  }
-
-  void _submitForm() {
-    if (_associateNameController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please enter associate name')),
+  Future<void> _submitForm() async {
+  if (_formKey.currentState!.validate()) {
+    try {
+      // Prepare datetime from date & time controllers
+      final now = DateTime.now();
+      final selectedDateTime = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        int.parse(_timeController.text.split(":")[0]),
+        int.parse(_timeController.text.split(":")[1]),
       );
-      return;
-    }
 
-    if (_capturedImage == null) {
+      setState(() {
+        _isSubmitting = true;
+      });
+
+      // Save visit to Firestore
+      await FirebaseFirestore.instance.collection('visits').add({
+        'userId': FirebaseAuth.instance.currentUser!.uid,
+        'associateName': _associateNameController.text.trim(),
+        'reraNumber': _reraNumberController.text.trim(),
+        'location': _locationController.text.trim(),
+        'photoUrl': _photoUrl ?? "", // Include photo URL if available
+        'dateTime': Timestamp.fromDate(selectedDateTime),
+        'status': "Pending",
+        'scheme': null,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please take a selfie')),
+        const SnackBar(
+          content: Text('Visit submitted successfully!'),
+          backgroundColor: Colors.green,
+        ),
       );
-      return;
+
+      Navigator.pop(context);
+    } catch (e) {
+      print("Error submitting visit: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to submit visit. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
-
-    // Here you would typically send the data to your backend
-    print('Associate Name: ${_associateNameController.text}');
-    print('Location: ${_locationController.text}');
-    print('Date: ${_dateController.text}');
-    print('Time: ${_timeController.text}');
-    print('Image Path: ${_capturedImage!.path}');
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Visit submitted successfully!'),
-        backgroundColor: Colors.green,
-      ),
-    );
-
-    // Navigate back or to next screen
-    Navigator.pop(context);
   }
+}
+
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'New Visit',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: const Text('New Visit'),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Associate Name Field
-            _buildTextField(
-              controller: _associateNameController,
-              label: 'Associate Name',
-              icon: Icons.person_outline,
-              isRequired: true,
-            ),
-            SizedBox(height: 20),
-
-            // Location Field (Auto-fetched)
-            _buildTextField(
-              controller: _locationController,
-              label: 'Location',
-              icon: Icons.location_on_outlined,
-              isReadOnly: true,
-              isLoading: _isLoadingLocation,
-              suffixIcon: IconButton(
-                icon: Icon(Icons.refresh),
-                onPressed: _getCurrentLocation,
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Camera preview or photo
+              Container(
+                height: 200,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: _photoUrl != null
+                    ? Container(
+                        width: double.infinity,
+                        height: 200,
+                        decoration: BoxDecoration(
+                          color: Colors.green[50],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.green),
+                        ),
+                        child: Stack(
+                          children: [
+                            const Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.check_circle, size: 50, color: Colors.green),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    'Photo captured successfully',
+                                    style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: CircleAvatar(
+                                backgroundColor: Colors.red,
+                                radius: 15,
+                                child: IconButton(
+                                  icon: const Icon(Icons.close, size: 15, color: Colors.white),
+                                  onPressed: () {
+                                    setState(() {
+                                      _photoUrl = null;
+                                    });
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : InkWell(
+                        onTap: _takePicture,
+                        child: Container(
+                          width: double.infinity,
+                          height: 200,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey),
+                          ),
+                          child: const Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.camera_alt, size: 50, color: Colors.grey),
+                              SizedBox(height: 8),
+                              Text('Tap to take photo', style: TextStyle(color: Colors.grey)),
+                            ],
+                          ),
+                        ),
+                      ),
               ),
-            ),
-            SizedBox(height: 20),
-
-            // Date Field (Auto-fetched)
-            _buildTextField(
-              controller: _dateController,
-              label: 'Date',
-              icon: Icons.calendar_today_outlined,
-              isReadOnly: true,
-            ),
-            SizedBox(height: 20),
-
-            // Time Field (Auto-fetched)
-            _buildTextField(
-              controller: _timeController,
-              label: 'Time',
-              icon: Icons.access_time_outlined,
-              isReadOnly: true,
-            ),
-            SizedBox(height: 30),
-
-            // Selfie Section
-            Text(
-              'Take Selfie *',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[700],
+              const SizedBox(height: 20),
+              
+              // Associate Name
+              TextFormField(
+                controller: _associateNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Associate Name',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter associate name';
+                  }
+                  return null;
+                },
               ),
-            ),
-            SizedBox(height: 10),
-            
-            _buildSelfieSection(),
-            
-            SizedBox(height: 40),
-
-            // Submit Button
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton(
-                onPressed: _submitForm,
+              const SizedBox(height: 16),
+              
+              // RERA Number
+              TextFormField(
+                controller: _reraNumberController,
+                decoration: const InputDecoration(
+                  labelText: 'RERA Number',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter RERA number';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              // Location (Auto-detected)
+              TextFormField(
+                controller: _locationController,
+                readOnly: true,
+                decoration: InputDecoration(
+                  labelText: 'Location (Auto-detected)',
+                  border: const OutlineInputBorder(),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  suffixIcon: _isLoadingLocation 
+                    ? Container(
+                        width: 20,
+                        height: 20,
+                        padding: EdgeInsets.all(12),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      )
+                    : IconButton(
+                        icon: const Icon(Icons.my_location),
+                        onPressed: _getCurrentLocation,
+                        tooltip: 'Refresh location',
+                      ),
+                  helperText: 'Location is automatically detected from your current position',
+                  helperMaxLines: 2,
+                ),
+                maxLines: 2,
+                minLines: 1,
+                validator: (value) {
+                  if (value == null || value.isEmpty || value.contains('Automatically detecting') || value == 'Detecting precise location...') {
+                    return 'Please wait for automatic location detection to complete';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              // Date
+              TextFormField(
+                controller: _dateController,
+                decoration: const InputDecoration(
+                  labelText: 'Date',
+                  border: OutlineInputBorder(),
+                ),
+                readOnly: true,
+              ),
+              const SizedBox(height: 16),
+              
+              // Time
+              TextFormField(
+                controller: _timeController,
+                decoration: const InputDecoration(
+                  labelText: 'Time',
+                  border: OutlineInputBorder(),
+                ),
+                readOnly: true,
+              ),
+              const SizedBox(height: 24),
+              
+              // Submit Button
+              ElevatedButton(
+                onPressed: _isSubmitting ? null : _submitForm,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Theme.of(context).colorScheme.primary,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                child: Text(
-                  'SUBMIT VISIT',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                child: _isSubmitting 
+                    ? const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Text('Submitting...'),
+                        ],
+                      )
+                    : const Text('Submit Visit'),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    bool isRequired = false,
-    bool isReadOnly = false,
-    bool isLoading = false,
-    Widget? suffixIcon,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '$label ${isRequired ? '*' : ''}',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey[700],
+            ],
           ),
         ),
-        SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          readOnly: isReadOnly,
-          decoration: InputDecoration(
-            prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.primary),
-            suffixIcon: isLoading 
-              ? SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: Padding(
-                    padding: EdgeInsets.all(12),
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                )
-              : suffixIcon,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
-            ),
-            filled: true,
-            fillColor: isReadOnly ? Colors.grey.shade50 : Colors.white,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSelfieSection() {
-    if (_capturedImage != null) {
-      return Container(
-        height: 300,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        child: Stack(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.file(
-                File(_capturedImage!.path),
-                width: double.infinity,
-                height: double.infinity,
-                fit: BoxFit.cover,
-              ),
-            ),
-            Positioned(
-              top: 10,
-              right: 10,
-              child: CircleAvatar(
-                backgroundColor: Colors.black54,
-                child: IconButton(
-                  icon: Icon(Icons.refresh, color: Colors.white),
-                  onPressed: _retakePicture,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (_isCameraInitialized && _cameraController != null) {
-      return Container(
-        height: 400,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        child: Stack(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: CameraPreview(_cameraController!),
-            ),
-            Positioned(
-              bottom: 20,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: FloatingActionButton(
-                  onPressed: _takePicture,
-                  backgroundColor: Colors.white,
-                  child: Icon(Icons.camera_alt, color: Colors.black, size: 30),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Container(
-      height: 200,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300, style: BorderStyle.solid),
-        color: Colors.grey.shade50,
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.camera_alt_outlined,
-            size: 50,
-            color: Colors.grey.shade400,
-          ),
-          SizedBox(height: 10),
-          Text(
-            'Tap to take selfie',
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 16,
-            ),
-          ),
-          SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: _initializeCamera,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Colors.white,
-            ),
-            child: Text('Open Camera'),
-          ),
-        ],
       ),
     );
   }

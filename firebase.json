@@ -1,0 +1,25 @@
+{
+  "firestore": {
+    "indexes": "firestore.indexes.json"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "vidhata-811df",
+          "appId": "1:708295037460:android:cec6700b74d3f9f4d1cd01",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "vidhata-811df",
+          "configurations": {
+            "android": "1:708295037460:android:cec6700b74d3f9f4d1cd01",
+            "web": "1:708295037460:web:e4d6586fc1c6c9a6d1cd01"
+          }
+        }
+      }
+    }
+  }
+}

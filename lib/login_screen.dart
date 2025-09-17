@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'my_home_page.dart';
-import 'admin_panel.dart';
+import 'admin/admin_panel.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -10,78 +12,80 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  
+
   bool _isPasswordVisible = false;
   bool _isLoading = false;
-  String _selectedRole = 'User';
-  
-  // Hardcoded credentials for demo - replace with proper authentication
-  final Map<String, Map<String, String>> _credentials = {
-    'admin': {'password': 'admin123', 'role': 'Admin'},
-    'user1': {'password': 'user123', 'role': 'User'},
-    'user2': {'password': 'user456', 'role': 'User'},
-  };
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
   Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
-    // Simulate network delay
-    await Future.delayed(Duration(seconds: 1));
+    try {
+      // Sign in with Firebase Auth
+      UserCredential userCredential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
 
-    final username = _usernameController.text.trim();
-    final password = _passwordController.text;
+      final uid = userCredential.user!.uid;
 
-    if (_credentials.containsKey(username) && 
-        _credentials[username]!['password'] == password) {
-      
-      final userRole = _credentials[username]!['role']!;
-      
-      setState(() {
-        _isLoading = false;
-      });
+      // Get user details from Firestore
+      final doc =
+          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+
+      if (!doc.exists) {
+        throw Exception("User record not found in Firestore.");
+      }
+
+      final userData = doc.data()!;
+      final bool isActive = userData['active'] ?? false;
+      final String role =
+          (userData['role'] ?? "user").toString().toLowerCase();
+      final String email = userData['email'] ?? "unknown";
+
+      if (!isActive) {
+        throw Exception("Your account has been deactivated. Contact admin.");
+      }
+
+      setState(() => _isLoading = false);
 
       // Navigate based on role
-      if (userRole == 'Admin') {
+      if (role == "admin") {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => AdminPanel(username: username),
+            builder: (_) => AdminPanel(username: email.split('@')[0]),
           ),
         );
       } else {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => MyHomePage(title: 'Vidhatasharnam'),
+            builder: (_) => MyHomePage(title: "Vidhatasharnam"),
           ),
         );
       }
-    } else {
-      setState(() {
-        _isLoading = false;
-      });
-      
+    } on FirebaseAuthException catch (e) {
+      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Invalid username or password'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text(e.message ?? "Authentication failed")),
+      );
+    } catch (e) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
       );
     }
   }
@@ -92,13 +96,13 @@ class _LoginScreenState extends State<LoginScreen> {
       backgroundColor: Colors.grey.shade50,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SizedBox(height: 60),
-              
-              // Logo and App Name
+              const SizedBox(height: 60),
+
+              // Logo + App Name
               Center(
                 child: Column(
                   children: [
@@ -113,7 +117,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             color: Colors.grey.withOpacity(0.1),
                             spreadRadius: 1,
                             blurRadius: 10,
-                            offset: Offset(0, 2),
+                            offset: const Offset(0, 2),
                           ),
                         ],
                       ),
@@ -132,7 +136,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
-                    SizedBox(height: 24),
+                    const SizedBox(height: 24),
                     Text(
                       'VIDHATASHARNAM',
                       style: TextStyle(
@@ -142,7 +146,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         letterSpacing: 1.2,
                       ),
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
                       'Welcome back! Please sign in to continue.',
                       style: TextStyle(
@@ -154,93 +158,75 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ),
               ),
-              
-              SizedBox(height: 48),
-              
+
+              const SizedBox(height: 48),
+
               // Login Form
               Form(
                 key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Username Field
+                    // Email
                     TextFormField(
-                      controller: _usernameController,
+                      controller: _emailController,
                       decoration: InputDecoration(
-                        labelText: 'Username',
-                        prefixIcon: Icon(Icons.person_outline),
+                        labelText: 'Email',
+                        prefixIcon: const Icon(Icons.email_outlined),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
                         ),
                         filled: true,
                         fillColor: Colors.white,
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
-                          return 'Please enter your username';
+                          return 'Please enter your email';
                         }
                         return null;
                       },
                     ),
-                    
-                    SizedBox(height: 20),
-                    
-                    // Password Field
+                    const SizedBox(height: 20),
+
+                    // Password
                     TextFormField(
                       controller: _passwordController,
                       obscureText: !_isPasswordVisible,
                       decoration: InputDecoration(
                         labelText: 'Password',
-                        prefixIcon: Icon(Icons.lock_outline),
+                        prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _isPasswordVisible ? Icons.visibility_off : Icons.visibility,
+                            _isPasswordVisible
+                                ? Icons.visibility_off
+                                : Icons.visibility,
                           ),
                           onPressed: () {
-                            setState(() {
-                              _isPasswordVisible = !_isPasswordVisible;
-                            });
+                            setState(() =>
+                                _isPasswordVisible = !_isPasswordVisible);
                           },
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
-                        ),
                         filled: true,
                         fillColor: Colors.white,
                       ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your password';
-                        }
-                        return null;
-                      },
+                      validator: (value) =>
+                          value == null || value.isEmpty
+                              ? 'Please enter your password'
+                              : null,
                     ),
-                    
-                    SizedBox(height: 32),
-                    
-                    // Login Button
+                    const SizedBox(height: 32),
+
+                    // Login button
                     SizedBox(
                       height: 56,
                       child: ElevatedButton(
                         onPressed: _isLoading ? null : _login,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          backgroundColor:
+                              Theme.of(context).colorScheme.primary,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -248,7 +234,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           elevation: 2,
                         ),
                         child: _isLoading
-                            ? Row(
+                            ? const Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   SizedBox(
@@ -269,45 +255,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 ],
                               )
-                            : Text(
+                            : const Text(
                                 'Sign In',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              
-              SizedBox(height: 40),
-              
-              // Demo Credentials Info
-              Container(
-                padding: EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Demo Credentials:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade800,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Admin: admin / admin123\nUser: user1 / user123',
-                      style: TextStyle(
-                        color: Colors.blue.shade700,
-                        fontSize: 14,
                       ),
                     ),
                   ],

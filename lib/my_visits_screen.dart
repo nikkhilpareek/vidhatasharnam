@@ -2,248 +2,138 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-class TotalVisitsScreen extends StatefulWidget {
-  const TotalVisitsScreen({super.key});
+class MyVisitsScreen extends StatefulWidget {
+  const MyVisitsScreen({super.key});
 
   @override
-  State<TotalVisitsScreen> createState() => _TotalVisitsScreenState();
+  State<MyVisitsScreen> createState() => _MyVisitsScreenState();
 }
 
-class _TotalVisitsScreenState extends State<TotalVisitsScreen> {
-  String selectedFilter = 'All';
-  final List<String> filterOptions = ['All', 'Accepted', 'Rejected', 'Pending'];
-
+class _MyVisitsScreenState extends State<MyVisitsScreen> {
   @override
   Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) {
-      return const Scaffold(body: Center(child: Text('Not authenticated')));
-    }
-
-    final query = FirebaseFirestore.instance
-        .collection('visits')
-        .where('userId', isEqualTo: uid); // no orderBy -> no composite index
+    final userId = FirebaseAuth.instance.currentUser!.uid;
 
     return Scaffold(
       appBar: AppBar(
+        title: const Text("My Visits"),
         backgroundColor: Theme.of(context).colorScheme.primary,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Total Visits',
-          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20, color: Colors.white),
-        ),
+        foregroundColor: Colors.white,
       ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: query.snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  'Error: ${snapshot.error}',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.red.shade600),
+      body: Container(
+        color: Colors.grey.shade50,
+        child: StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('visits')
+              .where('userId', isEqualTo: userId)
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return const Center(child: Text("Error loading visits"));
+            }
+            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              return const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.analytics_outlined, size: 80, color: Colors.grey),
+                    SizedBox(height: 20),
+                    Text(
+                      "No visits submitted yet",
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.grey),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      "Create your first visit to see it here",
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ],
                 ),
-              ),
+              );
+            }
+
+            final visits = snapshot.data!.docs;
+
+            return ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: visits.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final doc = visits[index];
+                final visit = doc.data() as Map<String, dynamic>;
+                return _UserVisitCard(
+                  visitId: doc.id,
+                  visit: visit,
+                );
+              },
             );
-          }
-
-          final docs = snapshot.data?.docs ?? [];
-
-          // Normalize, map, and sort locally by createdAt ASC
-          final visits = docs.map(_mapVisit).toList()
-            ..sort((a, b) {
-              final ta = a['createdAt'] as DateTime?;
-              final tb = b['createdAt'] as DateTime?;
-              if (ta == null || tb == null) return 0;
-              return ta.compareTo(tb);
-            });
-
-          // Counts (normalize 'Approved' -> 'Accepted' for display)
-          final acceptedCount = visits.where((v) => _displayStatus(v['status']) == 'Accepted').length;
-          final rejectedCount = visits.where((v) => _displayStatus(v['status']) == 'Rejected').length;
-          final pendingCount = visits.where((v) => _displayStatus(v['status']) == 'Pending').length;
-
-          // Filter by selected chip (client-side)
-          final filtered = selectedFilter == 'All'
-              ? visits
-              : visits.where((v) => _displayStatus(v['status']) == selectedFilter).toList();
-
-          return Container(
-            color: Colors.grey.shade50,
-            child: Column(
-              children: [
-                // Header stats
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Visit Summary',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.grey.shade700)),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _buildStatCard('Total', visits.length.toString(), Icons.analytics, Colors.grey.shade700),
-                          _buildStatCard('Accepted', acceptedCount.toString(), Icons.check_circle, Colors.green.shade600),
-                          _buildStatCard('Rejected', rejectedCount.toString(), Icons.cancel, Colors.red.shade600),
-                          _buildStatCard('Pending', pendingCount.toString(), Icons.access_time, Colors.orange.shade600),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Filters
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Text('Filter by: ',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: filterOptions.map((filter) {
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: FilterChip(
-                                  label: Text(filter),
-                                  selected: selectedFilter == filter,
-                                  onSelected: (_) => setState(() => selectedFilter = filter),
-                                  selectedColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-                                  checkmarkColor: Theme.of(context).colorScheme.primary,
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // List
-                Expanded(
-                  child: filtered.isEmpty
-                      ? _buildEmptyState(selectedFilter)
-                      : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: filtered.length,
-                          itemBuilder: (context, i) => _buildVisitCard(filtered[i]),
-                        ),
-                ),
-              ],
-            ),
-          );
-        },
+          },
+        ),
       ),
     );
   }
+}
 
-  Map<String, dynamic> _mapVisit(QueryDocumentSnapshot<Map<String, dynamic>> snap) {
-    final data = snap.data();
-    final status = (data['status'] ?? 'Pending').toString(); // likely 'Pending' | 'Approved' | 'Rejected'
-    // Resolve primary datetime
-    DateTime? dt;
-    if (data['dateTime'] is Timestamp) {
-      dt = (data['dateTime'] as Timestamp).toDate();
-    } else if (data['createdAt'] is Timestamp) {
-      dt = (data['createdAt'] as Timestamp).toDate();
-    }
+class _UserVisitCard extends StatelessWidget {
+  final String visitId;
+  final Map<String, dynamic> visit;
 
-    // UI fields
-    final dateStr = data['date']?.toString() ?? (dt != null ? _fmtDate(dt) : '--/--/----');
-    final timeStr = data['time']?.toString() ?? (dt != null ? _fmtTime(dt) : '--:--');
+  const _UserVisitCard({
+    required this.visitId,
+    required this.visit,
+  });
 
-    String submittedOn;
-    if (data['submittedOn'] != null) {
-      submittedOn = data['submittedOn'].toString();
-    } else if (data['createdAt'] is Timestamp) {
-      final cdt = (data['createdAt'] as Timestamp).toDate();
-      submittedOn = '${_fmtDate(cdt)} ${_pad2(cdt.hour)}:${_pad2(cdt.minute)}';
-    } else {
-      submittedOn = 'Unknown';
-    }
-
-    return {
-      'id': snap.id, // Add document ID for detailed view
-      'associateName': (data['associateName'] ?? 'Unknown').toString(),
-      'location': (data['location'] ?? 'N/A').toString(),
-      'date': dateStr,
-      'time': timeStr,
-      'status': status,
-      'submittedOn': submittedOn,
-      'createdAt': dt, // for local sort
-      'photoUrl': data['photoUrl']?.toString(), // Add photo URL
-      'scheme': data['scheme'], // Add scheme
-      'gajSold': data['gajSold'], // Add gaj sold
-      'originalData': data, // Keep original data for detailed view
-    };
-  }
-
-  // Map stored status to display (treat 'Approved' as 'Accepted')
-  String _displayStatus(String status) {
-    if (status == 'Approved') return 'Accepted';
-    return status;
-  }
-
-  Widget _buildStatCard(String label, String count, IconData icon, Color iconColor) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: iconColor.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-          child: Icon(icon, size: 24, color: iconColor),
-        ),
-        const SizedBox(height: 8),
-        Text(count, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
-        Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-      ],
-    );
-  }
-
-  Widget _buildVisitCard(Map<String, dynamic> visit) {
-    final displayStatus = _displayStatus(visit['status'] ?? 'Pending');
+  @override
+  Widget build(BuildContext context) {
+    final status = visit['status'] ?? 'Pending';
+    final associate = visit['associateName'] ?? 'N/A';
+    final location = visit['location'] ?? 'N/A';
+    final scheme = visit['scheme'];
+    final gajSold = visit['gajSold']; 
     final photoUrl = visit['photoUrl']?.toString();
-    final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
-    final hasScheme = visit['scheme'] != null && visit['scheme'].toString().isNotEmpty;
-    final hasGajSold = visit['gajSold'] != null && visit['gajSold'].toString().isNotEmpty;
+
+    String formattedDate = '';
+    if (visit['createdAt'] != null && visit['createdAt'] is Timestamp) {
+      try {
+        final ts = visit['createdAt'] as Timestamp;
+        final dt = ts.toDate();
+        formattedDate = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+      } catch (_) {}
+    }
 
     Color statusColor;
-    IconData statusIcon;
-    switch (displayStatus) {
-      case 'Accepted':
+    String displayStatus = status;
+    switch (status) {
+      case 'Approved':
         statusColor = Colors.green;
-        statusIcon = Icons.check_circle;
+        displayStatus = 'Approved';
         break;
       case 'Rejected':
         statusColor = Colors.red;
-        statusIcon = Icons.cancel;
+        displayStatus = 'Rejected';
         break;
-      case 'Pending':
       default:
         statusColor = Colors.orange;
-        statusIcon = Icons.access_time;
-        break;
+        displayStatus = 'Pending';
     }
 
+    // Check for missing information
+    final hasScheme = scheme != null && scheme.toString().isNotEmpty;
+    final hasGajSold = gajSold != null && gajSold.toString().isNotEmpty;
+    final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
+    
+    final missingInfo = <String>[];
+    if (!hasScheme && status == 'Approved') missingInfo.add('scheme');
+    if (!hasGajSold && status == 'Approved') missingInfo.add('gaj');
+    if (!hasPhoto) missingInfo.add('photo');
+
     return GestureDetector(
-      onTap: () => _showDetailedView(context, visit),
+      onTap: () => _showDetailedView(context),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
@@ -261,7 +151,12 @@ class _TotalVisitsScreenState extends State<TotalVisitsScreen> {
                 color: statusColor.withOpacity(0.12),
                 shape: BoxShape.circle,
               ),
-              child: Icon(statusIcon, color: statusColor, size: 20),
+              child: Icon(
+                status == 'Approved' ? Icons.check_circle : 
+                status == 'Rejected' ? Icons.cancel : Icons.access_time,
+                color: statusColor,
+                size: 20,
+              ),
             ),
             const SizedBox(width: 12),
             // Content
@@ -274,7 +169,7 @@ class _TotalVisitsScreenState extends State<TotalVisitsScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          visit['associateName'] ?? 'Unknown',
+                          associate,
                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -303,7 +198,7 @@ class _TotalVisitsScreenState extends State<TotalVisitsScreen> {
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          visit['location'] ?? 'N/A',
+                          location,
                           style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -316,138 +211,131 @@ class _TotalVisitsScreenState extends State<TotalVisitsScreen> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.calendar_today_outlined, size: 10, color: Colors.grey.shade500),
-                          const SizedBox(width: 2),
-                          Text(
-                            visit['date'] ?? '--/--/----',
-                            style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
-                          ),
-                          const SizedBox(width: 8),
-                          Icon(Icons.access_time_outlined, size: 10, color: Colors.grey.shade500),
-                          const SizedBox(width: 2),
-                          Text(
-                            visit['time'] ?? '--:--',
-                            style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
-                          ),
-                          // Add photo indicator
                           if (hasPhoto) ...[
-                            const SizedBox(width: 8),
-                            Icon(Icons.photo_camera, size: 10, color: Colors.green.shade600),
+                            Icon(Icons.photo_camera, size: 12, color: Colors.green.shade600),
+                            const SizedBox(width: 4),
                           ],
-                          // Add scheme indicator
                           if (hasScheme) ...[
+                            Icon(Icons.lightbulb_outline, size: 12, color: Colors.blue.shade600),
                             const SizedBox(width: 4),
-                            Icon(Icons.lightbulb_outline, size: 10, color: Colors.blue.shade600),
                           ],
-                          // Add gaj indicator
                           if (hasGajSold) ...[
+                            Icon(Icons.landscape_outlined, size: 12, color: Colors.purple.shade600),
                             const SizedBox(width: 4),
-                            Icon(Icons.landscape_outlined, size: 10, color: Colors.purple.shade600),
+                          ],
+                          // Warning indicators for missing info
+                          if (missingInfo.isNotEmpty) ...[
+                            Icon(Icons.warning_amber, size: 12, color: Colors.orange.shade600),
+                            const SizedBox(width: 4),
                           ],
                         ],
                       ),
-                      Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 16),
+                      if (formattedDate.isNotEmpty)
+                        Text(
+                          formattedDate,
+                          style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                        ),
                     ],
                   ),
                 ],
               ),
             ),
+            // Arrow
+            Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 20),
           ],
         ),
       ),
     );
   }
 
-  void _showDetailedView(BuildContext context, Map<String, dynamic> visit) {
+  void _showDetailedView(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _TotalVisitsDetailedView(
-        visitData: visit,
+      builder: (context) => _UserDetailedVisitView(
+        visitId: visitId,
+        visit: visit,
       ),
     );
-  }  Widget _buildEmptyState(String filter) {
-    String title;
-    String subtitle;
-    switch (filter) {
-      case 'Accepted':
-        title = 'No Accepted Visits';
-        subtitle = 'No visits have been accepted yet';
-        break;
-      case 'Rejected':
-        title = 'No Rejected Visits';
-        subtitle = 'No visits have been rejected';
-        break;
-      case 'Pending':
-        title = 'No Pending Visits';
-        subtitle = 'All visits have been processed';
-        break;
-      default:
-        title = 'No Visits Found';
-        subtitle = 'No visits have been created yet';
-    }
-    return Center(
-      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Icon(Icons.analytics_outlined, size: 80, color: Colors.grey.shade400),
-        const SizedBox(height: 20),
-        Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.grey)),
-        const SizedBox(height: 8),
-        Text(subtitle, style: TextStyle(fontSize: 14, color: Colors.grey.shade500)),
-        const SizedBox(height: 30),
-        ElevatedButton(
-          onPressed: () => Navigator.pop(context),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          ),
-          child: const Text('Go Back', style: TextStyle(fontWeight: FontWeight.w600)),
-        ),
-      ]),
-    );
   }
-
-  static String _fmtDate(DateTime dt) => '${_pad2(dt.day)}/${_pad2(dt.month)}/${dt.year}';
-  static String _fmtTime(DateTime dt) => '${_pad2(dt.hour)}:${_pad2(dt.minute)}';
-  static String _pad2(int v) => v.toString().padLeft(2, '0');
 }
 
-class _TotalVisitsDetailedView extends StatelessWidget {
-  final Map<String, dynamic> visitData;
+class _UserDetailedVisitView extends StatefulWidget {
+  final String visitId;
+  final Map<String, dynamic> visit;
 
-  const _TotalVisitsDetailedView({
-    required this.visitData,
+  const _UserDetailedVisitView({
+    required this.visitId,
+    required this.visit,
   });
 
   @override
+  State<_UserDetailedVisitView> createState() => _UserDetailedVisitViewState();
+}
+
+class _UserDetailedVisitViewState extends State<_UserDetailedVisitView> {
+  late Map<String, dynamic> currentVisit;
+
+  @override
+  void initState() {
+    super.initState();
+    currentVisit = Map<String, dynamic>.from(widget.visit);
+    _listenToVisitUpdates();
+  }
+
+  void _listenToVisitUpdates() {
+    // Listen to Firestore document changes
+    FirebaseFirestore.instance
+        .collection('visits')
+        .doc(widget.visitId)
+        .snapshots()
+        .listen((doc) {
+      if (doc.exists && mounted) {
+        setState(() {
+          final newData = doc.data() as Map<String, dynamic>;
+          currentVisit.addAll(newData);
+        });
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final displayStatus = visitData['status'] == 'Approved' ? 'Accepted' : visitData['status'];
-    final associate = visitData['associateName'] ?? 'N/A';
-    final location = visitData['location'] ?? 'N/A';
-    final scheme = visitData['scheme'];
-    final gajSold = visitData['gajSold'];
-    final photoUrl = visitData['photoUrl']?.toString();
-    final date = visitData['date'] ?? '--/--/----';
-    final time = visitData['time'] ?? '--:--';
-    final submittedOn = visitData['submittedOn'] ?? 'Unknown';
+    final status = currentVisit['status'] ?? 'Pending';
+    final associate = currentVisit['associateName'] ?? 'N/A';
+    final location = currentVisit['location'] ?? 'N/A';
+    final scheme = currentVisit['scheme'];
+    final gajSold = currentVisit['gajSold'];
+    final photoUrl = currentVisit['photoUrl']?.toString();
+
+    String formattedDate = '';
+    if (currentVisit['createdAt'] != null && currentVisit['createdAt'] is Timestamp) {
+      try {
+        final ts = currentVisit['createdAt'] as Timestamp;
+        final dt = ts.toDate();
+        formattedDate = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}  ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      } catch (_) {}
+    }
 
     Color statusColor;
+    String displayStatus = status;
     IconData statusIcon;
-    switch (displayStatus) {
-      case 'Accepted':
+    switch (status) {
+      case 'Approved':
         statusColor = Colors.green;
+        displayStatus = 'Approved';
         statusIcon = Icons.check_circle;
         break;
       case 'Rejected':
         statusColor = Colors.red;
+        displayStatus = 'Rejected';
         statusIcon = Icons.cancel;
         break;
-      case 'Pending':
       default:
         statusColor = Colors.orange;
+        displayStatus = 'Pending';
         statusIcon = Icons.access_time;
-        break;
     }
 
     return DraggableScrollableSheet(
@@ -547,16 +435,15 @@ class _TotalVisitsDetailedView extends StatelessWidget {
                       // Details
                       _detailRow(Icons.person_outline, 'Associate', associate),
                       _detailRow(Icons.place_outlined, 'Location', location),
-                      _detailRow(Icons.calendar_today_outlined, 'Date', date),
-                      _detailRow(Icons.access_time_outlined, 'Time', time),
+                      if (formattedDate.isNotEmpty) 
+                        _detailRow(Icons.access_time, 'Date & Time', formattedDate),
                       if (scheme != null && scheme.toString().isNotEmpty)
                         _detailRow(Icons.lightbulb_outline, 'Scheme', scheme.toString()),
                       if (gajSold != null && gajSold.toString().isNotEmpty)
                         _detailRow(Icons.landscape_outlined, 'Gaj Sold', '${gajSold} Gaj'),
-                      _detailRow(Icons.upload_outlined, 'Submitted On', submittedOn),
 
                       // Status message
-                      if (displayStatus == 'Pending') ...[
+                      if (status == 'Pending') ...[
                         const SizedBox(height: 8),
                         Container(
                           padding: const EdgeInsets.all(16),
@@ -581,7 +468,7 @@ class _TotalVisitsDetailedView extends StatelessWidget {
                             ],
                           ),
                         ),
-                      ] else if (displayStatus == 'Rejected') ...[
+                      ] else if (status == 'Rejected') ...[
                         const SizedBox(height: 8),
                         Container(
                           padding: const EdgeInsets.all(16),
@@ -606,7 +493,7 @@ class _TotalVisitsDetailedView extends StatelessWidget {
                             ],
                           ),
                         ),
-                      ] else if (displayStatus == 'Accepted') ...[
+                      ] else if (status == 'Approved') ...[
                         const SizedBox(height: 8),
                         Container(
                           padding: const EdgeInsets.all(16),

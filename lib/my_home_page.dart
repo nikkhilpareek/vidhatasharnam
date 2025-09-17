@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
 import 'new_visit.dart';
 import 'pending_visit.dart';
+import 'profile_page.dart';
 import 'total_visits.dart';
+import 'total_gaj_sold.dart';
+import 'community.dart';
+import 'login_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
@@ -13,6 +21,25 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  String? userName;
+  @override
+void initState() {
+  super.initState();
+  _loadUserData();
+}
+
+Future<void> _loadUserData() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user != null) {
+    final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    if (doc.exists) {
+      setState(() {
+        userName = doc['username']; // 👈 make sure your Firestore has a "name" field
+      });
+    }
+  }
+}
 
   Widget _buildCardButton({
     required String title,
@@ -111,11 +138,62 @@ class _MyHomePageState extends State<MyHomePage> {
                     ),
                     onTap: () {
                       Navigator.pop(context);
-                      print('Profile tapped');
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ProfilePage()),
+                      );
                     },
+
                   ),
                   SizedBox(height: 10),
-                  ListTile(
+                  
+                  ExpansionTile(
+                    leading: Icon(
+                      Icons.business_outlined,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 28,
+                    ),
+                    title: Text(
+                      'Our Projects',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    children: [
+                      ListTile(
+                        leading: Icon(
+                          Icons.web,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 24,
+                        ),
+                        title: Text(
+                          'View More Projects',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                        onTap: () async {
+                          Navigator.pop(context);
+                          try {
+                            final url = Uri.parse('https://vidhatasharanam.com');
+                            await launchUrl(url, mode: LaunchMode.externalApplication);
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Could not open website: $e')),
+                              );
+                            }
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 10),
+                  
+                  // Contact Us Section
+                  ExpansionTile(
                     leading: Icon(
                       Icons.contact_support_outlined,
                       color: Theme.of(context).colorScheme.primary,
@@ -128,10 +206,62 @@ class _MyHomePageState extends State<MyHomePage> {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      print('Contact Us tapped');
-                    },
+                    children: [
+                      ListTile(
+                        leading: Icon(
+                          Icons.email_outlined,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 20,
+                        ),
+                        title: Text(
+                          'vidhatasharanam@gmail.com',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                        onTap: () async {
+                          Navigator.pop(context);
+                          try {
+                            final url = Uri.parse('mailto:vidhatasharanam@gmail.com');
+                            await launchUrl(url);
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Could not open email app: $e')),
+                              );
+                            }
+                          }
+                        },
+                      ),
+                      ListTile(
+                        leading: Icon(
+                          Icons.phone_outlined,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 20,
+                        ),
+                        title: Text(
+                          '+91-9460067878',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                        onTap: () async {
+                          Navigator.pop(context);
+                          try {
+                            final url = Uri.parse('tel:+919460067878');
+                            await launchUrl(url);
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Could not open phone app: $e')),
+                              );
+                            }
+                          }
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -191,15 +321,69 @@ class _MyHomePageState extends State<MyHomePage> {
                 style: TextStyle(color: Colors.red),
               ),
               onPressed: () {
-                Navigator.of(context).pop();
-                print('User logged out');
-                // Add actual logout logic here
+                Navigator.of(context).pop(); // Close dialog first
+                _performLogout();
               },
             ),
           ],
         );
       },
     );
+  }
+
+  void _performLogout() {
+    // Show loading indicator briefly
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Center(
+          child: Container(
+            padding: EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Logging out...',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    // Simulate logout process and navigate to login screen
+    Future.delayed(Duration(seconds: 1), () {
+      Navigator.of(context).pop(); // Close loading dialog
+      
+      // Navigate to login screen and clear all previous routes
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => LoginScreen()),
+        (Route<dynamic> route) => false,
+      );
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Successfully logged out'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    });
   }
 
   @override
@@ -222,7 +406,7 @@ class _MyHomePageState extends State<MyHomePage> {
             }, 
             icon: Icon(Icons.menu)
           ),
-          Padding(padding: EdgeInsetsGeometry.symmetric(horizontal: 1))
+          SizedBox(width: 16),
         ],
       ),
       endDrawer: _buildDrawer(),
@@ -247,7 +431,7 @@ class _MyHomePageState extends State<MyHomePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "Welcome back, User",
+              "Welcome back, ${userName ?? 'User'}",
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -302,7 +486,12 @@ class _MyHomePageState extends State<MyHomePage> {
                     title: "Total Gaj Sold",
                     icon: Icons.landscape_outlined,
                     onTap: () {
-                      print("Total Gaj Sold tapped");
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => TotalGajSoldScreen(),
+                        ),
+                      );
                     },
                   ),
                 ],
@@ -345,7 +534,12 @@ class _MyHomePageState extends State<MyHomePage> {
               children: [
                 IconButton(
                   onPressed: () {
-                    print("Community tapped");
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CommunityScreen(),
+                      ),
+                    );
                   },
                   icon: Icon(Icons.group, size: 26, color: Colors.grey.shade600),
                 ),
