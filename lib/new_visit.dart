@@ -17,7 +17,11 @@ class NewVisitScreen extends StatefulWidget {
 class _NewVisitScreenState extends State<NewVisitScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _associateNameController = TextEditingController();
+  final TextEditingController _customerNameController = TextEditingController();
+  final TextEditingController _upperlineNameController = TextEditingController();
+  final TextEditingController _teamleaderNameController = TextEditingController();
   final TextEditingController _reraNumberController = TextEditingController();
+  final TextEditingController _schemeNameController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _timeController = TextEditingController();
@@ -36,7 +40,11 @@ class _NewVisitScreenState extends State<NewVisitScreen> {
   @override
   void dispose() {
     _associateNameController.dispose();
+    _customerNameController.dispose();
+    _upperlineNameController.dispose();
+    _teamleaderNameController.dispose();
     _reraNumberController.dispose();
+    _schemeNameController.dispose();
     _locationController.dispose();
     _dateController.dispose();
     _timeController.dispose();
@@ -217,12 +225,16 @@ class _NewVisitScreenState extends State<NewVisitScreen> {
       await FirebaseFirestore.instance.collection('visits').add({
         'userId': FirebaseAuth.instance.currentUser!.uid,
         'associateName': _associateNameController.text.trim(),
+        'customerName': _customerNameController.text.trim(),
+        'upperlineName': _upperlineNameController.text.trim(),
+        'teamleaderName': _teamleaderNameController.text.trim(),
         'reraNumber': _reraNumberController.text.trim(),
+        'schemeName': _schemeNameController.text.trim(),
         'location': _locationController.text.trim(),
         'photoUrl': _photoUrl ?? "", // Include photo URL if available
         'dateTime': Timestamp.fromDate(selectedDateTime),
         'status': "Pending",
-        'scheme': null,
+        'scheme': null, // Keep for backward compatibility
         'createdAt': FieldValue.serverTimestamp(),
       });
 
@@ -357,6 +369,54 @@ class _NewVisitScreenState extends State<NewVisitScreen> {
               ),
               const SizedBox(height: 16),
               
+              // Customer Name
+              TextFormField(
+                controller: _customerNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Customer Name',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter customer name';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              // Upperline Name
+              TextFormField(
+                controller: _upperlineNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Upperline Name',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter upperline name';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              // Teamleader Name
+              TextFormField(
+                controller: _teamleaderNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Teamleader Name',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter teamleader name';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              
               // RERA Number
               TextFormField(
                 controller: _reraNumberController,
@@ -367,6 +427,22 @@ class _NewVisitScreenState extends State<NewVisitScreen> {
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter RERA number';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              // Scheme Name
+              TextFormField(
+                controller: _schemeNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Scheme Name',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter scheme name';
                   }
                   return null;
                 },

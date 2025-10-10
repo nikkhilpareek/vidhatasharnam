@@ -142,12 +142,36 @@ class _TotalGajSoldScreenState extends State<TotalGajSoldScreen> {
               children: [
                 _buildDetailRow('Date', _formatDate(visit['date'])),
                 const SizedBox(height: 8),
-                _buildDetailRow('Associate', visit['associateName']),
+                _buildDetailRow('Associate Name', visit['associateName']),
                 const SizedBox(height: 8),
+                if (visit['customerName'] != null && visit['customerName'] != 'N/A') ...[
+                  _buildDetailRow('Customer Name', visit['customerName']),
+                  const SizedBox(height: 8),
+                ],
+                if (visit['upperlineName'] != null && visit['upperlineName'] != 'N/A') ...[
+                  _buildDetailRow('Upperline Name', visit['upperlineName']),
+                  const SizedBox(height: 8),
+                ],
+                if (visit['teamleaderName'] != null && visit['teamleaderName'] != 'N/A') ...[
+                  _buildDetailRow('Teamleader Name', visit['teamleaderName']),
+                  const SizedBox(height: 8),
+                ],
+                if (visit['reraNumber'] != null && visit['reraNumber'] != 'N/A') ...[
+                  _buildDetailRow('RERA Number', visit['reraNumber']),
+                  const SizedBox(height: 8),
+                ],
                 _buildDetailRow('Location', visit['location']),
                 const SizedBox(height: 8),
-                _buildDetailRow('Scheme', visit['scheme']),
+                _buildDetailRow('Scheme Name', visit['schemeName'] ?? visit['scheme'] ?? 'N/A'),
                 const SizedBox(height: 8),
+                if (visit['plotNumber'] != null && visit['plotNumber'] != 'N/A') ...[
+                  _buildDetailRow('Plot Number', visit['plotNumber']),
+                  const SizedBox(height: 8),
+                ],
+                if (visit['clientName'] != null && visit['clientName'] != 'N/A') ...[
+                  _buildDetailRow('Client Name', visit['clientName']),
+                  const SizedBox(height: 8),
+                ],
                 _buildDetailRow('Gaj Sold', '${visit['gajSold']} Gaj'),
               ],
             ),
@@ -271,8 +295,15 @@ class _TotalGajSoldScreenState extends State<TotalGajSoldScreen> {
             
             visitData.add({
               'associateName': data['associateName'] ?? 'N/A',
+              'customerName': data['customerName'] ?? 'N/A',
+              'upperlineName': data['upperlineName'] ?? 'N/A',
+              'teamleaderName': data['teamleaderName'] ?? 'N/A',
+              'reraNumber': data['reraNumber'] ?? 'N/A',
+              'schemeName': data['schemeName'] ?? 'N/A',
+              'plotNumber': data['plotNumber'] ?? 'N/A',
+              'clientName': data['clientName'] ?? 'N/A',
               'location': data['location'] ?? 'N/A',
-              'scheme': data['scheme'] ?? 'N/A',
+              'scheme': data['scheme'] ?? 'N/A', // Keep for backward compatibility
               'gajSold': gajSold,
               'date': visitDate ?? DateTime.now(),
             });

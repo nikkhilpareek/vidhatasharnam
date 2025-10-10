@@ -83,6 +83,19 @@ class _ProfilePageState extends State<ProfilePage> {
               backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
               child: Icon(Icons.person, size: 60, color: Theme.of(context).colorScheme.primary),
             ),
+            const SizedBox(height: 12),
+            
+            // Tagline
+            Text(
+              'Turning land into legacy',
+              style: TextStyle(
+                fontSize: 14,
+                fontStyle: FontStyle.italic,
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                letterSpacing: 0.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 20),
 
             // Email (read-only)

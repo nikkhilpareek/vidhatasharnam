@@ -4,7 +4,15 @@ import 'package:flutter/material.dart';
 class DashboardTab extends StatelessWidget {
   final VoidCallback onCreateUser;
   final VoidCallback onManageVisits;
-  const DashboardTab({super.key, required this.onCreateUser, required this.onManageVisits});
+  final VoidCallback? onTotalUsersCard;
+  final VoidCallback? onPendingVisitsCard;
+  const DashboardTab({
+    super.key, 
+    required this.onCreateUser, 
+    required this.onManageVisits,
+    this.onTotalUsersCard,
+    this.onPendingVisitsCard,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +37,8 @@ class DashboardTab extends StatelessWidget {
                   stream: FirebaseFirestore.instance.collection('users').snapshots(),
                   builder: (context, snapshot) {
                     final totalUsers = snapshot.hasData ? snapshot.data!.docs.length : 0;
-                    return _buildStatsCard('Total Users', totalUsers.toString(), Icons.people, Colors.blue);
+                    return _buildStatsCard('Total Users', totalUsers.toString(), Icons.people, Colors.blue, 
+                      onTap: onTotalUsersCard);
                   },
                 ),
               ),
@@ -39,7 +48,8 @@ class DashboardTab extends StatelessWidget {
                   stream: FirebaseFirestore.instance.collection('visits').where('status', isEqualTo: 'Pending').snapshots(),
                   builder: (context, snapshot) {
                     final pendingCount = snapshot.hasData ? snapshot.data!.docs.length : 0;
-                    return _buildStatsCard('Pending Visits', pendingCount.toString(), Icons.pending_actions, Colors.orange);
+                    return _buildStatsCard('Pending Visits', pendingCount.toString(), Icons.pending_actions, Colors.orange,
+                      onTap: onPendingVisitsCard);
                   },
                 ),
               ),
@@ -337,34 +347,48 @@ class DashboardTab extends StatelessWidget {
     }
   }
 
-  Widget _buildStatsCard(String title, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
+  Widget _buildStatsCard(String title, String value, IconData icon, Color color, {VoidCallback? onTap}) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.15),
-            spreadRadius: 1,
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              CircleAvatar(backgroundColor: color.withOpacity(0.1), child: Icon(icon, color: color, size: 24)),
-              Text(value, style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: color)),
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.15),
+                spreadRadius: 1,
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(title, style: TextStyle(fontSize: 14, color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
-        ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  CircleAvatar(backgroundColor: color.withOpacity(0.1), child: Icon(icon, color: color, size: 24)),
+                  Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(title, style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+                  if (onTap != null)
+                    Icon(Icons.arrow_forward_ios, size: 10, color: Colors.grey.shade400),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

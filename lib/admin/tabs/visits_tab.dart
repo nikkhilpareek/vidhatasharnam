@@ -2,16 +2,23 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 class VisitsTab extends StatefulWidget {
-  const VisitsTab({super.key});
+  final String? initialFilter;
+  const VisitsTab({super.key, this.initialFilter});
 
   @override
   State<VisitsTab> createState() => _VisitsTabState();
 }
 
 class _VisitsTabState extends State<VisitsTab> {
-  String _visitStatusFilter = 'All';
+  late String _visitStatusFilter;
   String _visitSearchQuery = '';
   Map<String, int> _statusChipCounts = {'Pending': 0, 'Approved': 0, 'Rejected': 0};
+
+  @override
+  void initState() {
+    super.initState();
+    _visitStatusFilter = widget.initialFilter ?? 'All';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +36,7 @@ class _VisitsTabState extends State<VisitsTab> {
                 const SizedBox(height: 12),
                 TextField(
                   decoration: InputDecoration(
-                    hintText: 'Search by username, associate, location... ',
+                    hintText: 'Search by username, associate, customer, RERA, scheme... ',
                     prefixIcon: const Icon(Icons.search),
                     filled: true,
                     fillColor: Colors.grey.shade50,
@@ -117,9 +124,19 @@ class _VisitsTabState extends State<VisitsTab> {
                         final userId = data['userId'] ?? '';
                         final username = (userNameMap[userId] ?? '').toLowerCase();
                         final associate = (data['associateName'] ?? '').toString().toLowerCase();
+                        final customer = (data['customerName'] ?? '').toString().toLowerCase();
+                        final upperline = (data['upperlineName'] ?? '').toString().toLowerCase();
+                        final teamleader = (data['teamleaderName'] ?? '').toString().toLowerCase();
+                        final rera = (data['reraNumber'] ?? '').toString().toLowerCase();
+                        final schemeName = (data['schemeName'] ?? '').toString().toLowerCase();
                         final location = (data['location'] ?? '').toString().toLowerCase();
                         return username.contains(_visitSearchQuery) ||
                             associate.contains(_visitSearchQuery) ||
+                            customer.contains(_visitSearchQuery) ||
+                            upperline.contains(_visitSearchQuery) ||
+                            teamleader.contains(_visitSearchQuery) ||
+                            rera.contains(_visitSearchQuery) ||
+                            schemeName.contains(_visitSearchQuery) ||
                             location.contains(_visitSearchQuery);
                       });
                     }
@@ -184,8 +201,10 @@ class _VisitsTabState extends State<VisitsTab> {
   }
 
   void _showAssignSchemeDialog(String visitId, String? existingScheme) {
-    final schemeController = TextEditingController(text: existingScheme ?? "");
-    final gazSoldController = TextEditingController();
+    final schemeNameController = TextEditingController();
+    final plotNumberController = TextEditingController();
+    final clientNameController = TextEditingController();
+    final gajSoldController = TextEditingController();
 
     showDialog(
       context: context,
@@ -197,49 +216,114 @@ class _VisitsTabState extends State<VisitsTab> {
           builder: (context, snap) {
             if (snap.hasData) {
               final data = snap.data!.data() as Map<String, dynamic>? ?? {};
-              final existingGaj = (data['gajSold'] ?? '').toString(); // Changed gazSold to gajSold
-              if (gazSoldController.text.isEmpty) {
-                gazSoldController.text = existingGaj;
+              
+              // Pre-populate fields with existing data or defaults
+              if (schemeNameController.text.isEmpty) {
+                schemeNameController.text = data['schemeName'] ?? data['scheme'] ?? existingScheme ?? '';
+              }
+              if (plotNumberController.text.isEmpty) {
+                plotNumberController.text = (data['plotNumber'] ?? '').toString();
+              }
+              if (clientNameController.text.isEmpty) {
+                clientNameController.text = (data['clientName'] ?? '').toString();
+              }
+              if (gajSoldController.text.isEmpty) {
+                gajSoldController.text = (data['gajSold'] ?? '').toString();
               }
             }
 
             return AlertDialog(
-              title: const Text("Assign Scheme"),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: schemeController,
-                      decoration: const InputDecoration(labelText: "Scheme details", border: OutlineInputBorder()),
-                      maxLines: 3,
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: gazSoldController,
-                      decoration: const InputDecoration(labelText: "Gaj sold", border: OutlineInputBorder()),
-                      keyboardType: TextInputType.number,
-                    ),
-                  ],
+              title: const Text("Assign Scheme Details"),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: schemeNameController,
+                        decoration: const InputDecoration(
+                          labelText: "Scheme Name",
+                          border: OutlineInputBorder(),
+                          hintText: "Enter scheme name",
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: plotNumberController,
+                        decoration: const InputDecoration(
+                          labelText: "Plot Number",
+                          border: OutlineInputBorder(),
+                          hintText: "Enter plot number",
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: clientNameController,
+                        decoration: const InputDecoration(
+                          labelText: "Client Name",
+                          border: OutlineInputBorder(),
+                          hintText: "Enter client name",
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: gajSoldController,
+                        decoration: const InputDecoration(
+                          labelText: "Gaj Sold",
+                          border: OutlineInputBorder(),
+                          hintText: "Enter gaj sold",
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ],
+                  ),
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+                TextButton(
+                  onPressed: () => Navigator.pop(context), 
+                  child: const Text("Cancel"),
+                ),
                 ElevatedButton(
                   onPressed: () async {
-                    final newScheme = schemeController.text.trim();
-                    final gazSoldText = gazSoldController.text.trim();
+                    final schemeName = schemeNameController.text.trim();
+                    final plotNumber = plotNumberController.text.trim();
+                    final clientName = clientNameController.text.trim();
+                    final gajSoldText = gajSoldController.text.trim();
                     
-                    // Convert gazSold to number, default to 0 if invalid
-                    final gazSoldNumber = int.tryParse(gazSoldText) ?? 0;
+                    // Validation
+                    if (schemeName.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Please enter scheme name")),
+                      );
+                      return;
+                    }
                     
-                    await FirebaseFirestore.instance.collection('visits').doc(visitId).update({
-                      'scheme': newScheme,
-                      'gajSold': gazSoldNumber, // Store as number, not string
-                    });
-                    if (!context.mounted) return;
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Details updated successfully")));
+                    // Convert gajSold to number, default to 0 if invalid
+                    final gajSoldNumber = int.tryParse(gajSoldText) ?? 0;
+                    
+                    try {
+                      await FirebaseFirestore.instance.collection('visits').doc(visitId).update({
+                        'schemeName': schemeName,
+                        'plotNumber': plotNumber,
+                        'clientName': clientName,
+                        'gajSold': gajSoldNumber,
+                        'scheme': schemeName, // Keep for backward compatibility
+                        'updatedAt': FieldValue.serverTimestamp(),
+                      });
+                      
+                      if (!context.mounted) return;
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Scheme details updated successfully")),
+                      );
+                    } catch (e) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Error updating scheme details: $e")),
+                      );
+                    }
                   },
                   child: const Text("Save"),
                 ),
@@ -597,14 +681,26 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
                       const SizedBox(height: 24),
                       
                       // Details
-                      _detailRow(Icons.person_outline, 'Associate', associate),
+                      _detailRow(Icons.person_outline, 'Associate Name', associate),
+                      _detailRow(Icons.person_outline, 'Customer Name', currentVisit['customerName'] ?? 'N/A'),
+                      _detailRow(Icons.person_outline, 'Upperline Name', currentVisit['upperlineName'] ?? 'N/A'),
+                      _detailRow(Icons.person_outline, 'Teamleader Name', currentVisit['teamleaderName'] ?? 'N/A'),
+                      _detailRow(Icons.numbers_outlined, 'RERA Number', currentVisit['reraNumber'] ?? 'N/A'),
+                      _detailRow(Icons.lightbulb_outline, 'Scheme Name', currentVisit['schemeName'] ?? 'N/A'),
                       _detailRow(Icons.place_outlined, 'Location', location),
                       if (formattedDate.isNotEmpty) 
                         _detailRow(Icons.access_time, 'Date & Time', formattedDate),
-                      if (scheme != null && scheme.toString().isNotEmpty)
-                        _detailRow(Icons.lightbulb_outline, 'Scheme', scheme.toString()),
+                      
+                      // Scheme assignment details
+                      if (currentVisit['plotNumber'] != null && currentVisit['plotNumber'].toString().isNotEmpty)
+                        _detailRow(Icons.home_outlined, 'Plot Number', currentVisit['plotNumber'].toString()),
+                      if (currentVisit['clientName'] != null && currentVisit['clientName'].toString().isNotEmpty)
+                        _detailRow(Icons.person_outline, 'Client Name', currentVisit['clientName'].toString()),
                       if (gajSold != null && gajSold.toString().isNotEmpty)
                         _detailRow(Icons.landscape_outlined, 'Gaj Sold', '${gajSold} Gaj'),
+                      
+                      if (scheme != null && scheme.toString().isNotEmpty)
+                        _detailRow(Icons.lightbulb_outline, 'Old Scheme', scheme.toString()),
 
                       // Photo section
                       if (photoUrl != null && photoUrl.isNotEmpty) ...[

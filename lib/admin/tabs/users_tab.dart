@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class UsersTab extends StatelessWidget {
   final VoidCallback onCreateUser;
@@ -62,6 +63,138 @@ class _UserCard extends StatelessWidget {
   final Map<String, dynamic> user;
   const _UserCard({required this.uid, required this.user});
 
+  void _showChangePasswordDialog(BuildContext context, String userId, String username, String email) {
+    bool _isSendingReset = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(builder: (context, setStateDialog) {
+        return AlertDialog(
+          title: Text('Reset Password for $username'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, color: Colors.blue),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('User: $username', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            Text('Email: $email', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  ),
+                  child: const Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.email_outlined, color: Colors.orange),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'A password reset email will be sent to the user\'s email address. They will need to follow the instructions in the email to set a new password.',
+                          style: TextStyle(fontSize: 13, color: Colors.black87),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: _isSendingReset
+                  ? null
+                  : () async {
+                      setStateDialog(() {
+                        _isSendingReset = true;
+                      });
+
+                      try {
+                        // Send password reset email to the user
+                        await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+                        
+                        // Store admin action in Firestore for audit trail
+                        await FirebaseFirestore.instance.collection('users').doc(userId).update({
+                          'passwordResetSentBy': FirebaseAuth.instance.currentUser?.uid,
+                          'passwordResetSentAt': FieldValue.serverTimestamp(),
+                          'adminRequestedPasswordChange': true,
+                        });
+
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Password reset email sent to $email. User will receive instructions to reset their password.'),
+                              backgroundColor: Colors.green,
+                              duration: const Duration(seconds: 4),
+                            ),
+                          );
+                        }
+                      } on FirebaseAuthException catch (e) {
+                        String errorMessage = 'Failed to send password reset email';
+                        if (e.code == 'user-not-found') {
+                          errorMessage = 'No user found with this email address';
+                        } else if (e.code == 'invalid-email') {
+                          errorMessage = 'Invalid email address';
+                        }
+                        
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(errorMessage),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      } finally {
+                        setStateDialog(() {
+                          _isSendingReset = false;
+                        });
+                      }
+                    },
+              child: _isSendingReset
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Send Reset Email'),
+            ),
+          ],
+        );
+      }),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final username = (user['username'] ?? user['email']?.split('@')?.first ?? 'Unknown').toString();
@@ -106,6 +239,12 @@ class _UserCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(statusText, style: TextStyle(color: activeBool ? Colors.green.shade700 : Colors.red.shade700, fontWeight: FontWeight.w600, fontSize: 12)),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.lock_reset, color: Colors.blue),
+            tooltip: 'Change Password',
+            onPressed: () => _showChangePasswordDialog(context, uid, username, email),
           ),
           const SizedBox(width: 8),
           Switch(

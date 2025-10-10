@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'admin/tabs/community_admin_tab.dart';
+import 'services/community_notification_service.dart';
 
 class CommunityScreen extends StatefulWidget {
   const CommunityScreen({super.key});
@@ -19,6 +20,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
     super.initState();
     _uid = FirebaseAuth.instance.currentUser?.uid;
     _loadRole();
+    
+    // Mark community notifications as read when opening community screen
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      CommunityNotificationService.instance.markAsRead();
+    });
   }
 
   Future<void> _loadRole() async {

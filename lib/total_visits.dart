@@ -181,6 +181,13 @@ class _TotalVisitsScreenState extends State<TotalVisitsScreen> {
     return {
       'id': snap.id, // Add document ID for detailed view
       'associateName': (data['associateName'] ?? 'Unknown').toString(),
+      'customerName': (data['customerName'] ?? 'N/A').toString(),
+      'upperlineName': (data['upperlineName'] ?? 'N/A').toString(),
+      'teamleaderName': (data['teamleaderName'] ?? 'N/A').toString(),
+      'reraNumber': (data['reraNumber'] ?? 'N/A').toString(),
+      'schemeName': (data['schemeName'] ?? data['scheme'] ?? 'N/A').toString(), // Use schemeName, fallback to scheme
+      'plotNumber': (data['plotNumber'] ?? 'N/A').toString(),
+      'clientName': (data['clientName'] ?? 'N/A').toString(),
       'location': (data['location'] ?? 'N/A').toString(),
       'date': dateStr,
       'time': timeStr,
@@ -188,7 +195,7 @@ class _TotalVisitsScreenState extends State<TotalVisitsScreen> {
       'submittedOn': submittedOn,
       'createdAt': dt, // for local sort
       'photoUrl': data['photoUrl']?.toString(), // Add photo URL
-      'scheme': data['scheme'], // Add scheme
+      'scheme': data['scheme'], // Add scheme for backward compatibility
       'gajSold': data['gajSold'], // Add gaj sold
       'originalData': data, // Keep original data for detailed view
     };
@@ -545,14 +552,26 @@ class _TotalVisitsDetailedView extends StatelessWidget {
                       const SizedBox(height: 24),
                       
                       // Details
-                      _detailRow(Icons.person_outline, 'Associate', associate),
+                      _detailRow(Icons.person_outline, 'Associate Name', associate),
+                      _detailRow(Icons.person_outline, 'Customer Name', visitData['customerName'] ?? 'N/A'),
+                      _detailRow(Icons.person_outline, 'Upperline Name', visitData['upperlineName'] ?? 'N/A'),
+                      _detailRow(Icons.person_outline, 'Teamleader Name', visitData['teamleaderName'] ?? 'N/A'),
+                      _detailRow(Icons.numbers_outlined, 'RERA Number', visitData['reraNumber'] ?? 'N/A'),
+                      _detailRow(Icons.lightbulb_outline, 'Scheme Name', visitData['schemeName'] ?? 'N/A'),
                       _detailRow(Icons.place_outlined, 'Location', location),
                       _detailRow(Icons.calendar_today_outlined, 'Date', date),
                       _detailRow(Icons.access_time_outlined, 'Time', time),
-                      if (scheme != null && scheme.toString().isNotEmpty)
-                        _detailRow(Icons.lightbulb_outline, 'Scheme', scheme.toString()),
+                      
+                      // Scheme assignment details (if visit is approved and has these details)
+                      if (visitData['originalData']['plotNumber'] != null && visitData['originalData']['plotNumber'].toString().isNotEmpty)
+                        _detailRow(Icons.home_outlined, 'Plot Number', visitData['originalData']['plotNumber'].toString()),
+                      if (visitData['originalData']['clientName'] != null && visitData['originalData']['clientName'].toString().isNotEmpty)
+                        _detailRow(Icons.person_outline, 'Client Name', visitData['originalData']['clientName'].toString()),
                       if (gajSold != null && gajSold.toString().isNotEmpty)
                         _detailRow(Icons.landscape_outlined, 'Gaj Sold', '${gajSold} Gaj'),
+                        
+                      if (scheme != null && scheme.toString().isNotEmpty)
+                        _detailRow(Icons.lightbulb_outline, 'Old Scheme', scheme.toString()),
                       _detailRow(Icons.upload_outlined, 'Submitted On', submittedOn),
 
                       // Status message

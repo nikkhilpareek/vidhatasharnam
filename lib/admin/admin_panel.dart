@@ -33,6 +33,168 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
     super.dispose();
   }
 
+  void _showAdminPasswordChangeDialog() {
+    final currentPasswordController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool _currentPasswordVisible = false;
+    bool _newPasswordVisible = false;
+    bool _confirmPasswordVisible = false;
+    bool _isChangingPassword = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(builder: (context, setStateDialog) {
+        return AlertDialog(
+          title: const Text('Change Admin Password'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: currentPasswordController,
+                    decoration: InputDecoration(
+                      labelText: 'Current Password',
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(_currentPasswordVisible ? Icons.visibility : Icons.visibility_off),
+                        onPressed: () {
+                          setStateDialog(() {
+                            _currentPasswordVisible = !_currentPasswordVisible;
+                          });
+                        },
+                      ),
+                    ),
+                    obscureText: !_currentPasswordVisible,
+                    validator: (v) => v == null || v.isEmpty ? 'Enter current password' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: newPasswordController,
+                    decoration: InputDecoration(
+                      labelText: 'New Password',
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.lock),
+                      suffixIcon: IconButton(
+                        icon: Icon(_newPasswordVisible ? Icons.visibility : Icons.visibility_off),
+                        onPressed: () {
+                          setStateDialog(() {
+                            _newPasswordVisible = !_newPasswordVisible;
+                          });
+                        },
+                      ),
+                    ),
+                    obscureText: !_newPasswordVisible,
+                    validator: (v) => v == null || v.length < 6 ? 'Use 6+ characters' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: confirmPasswordController,
+                    decoration: InputDecoration(
+                      labelText: 'Confirm New Password',
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.lock_clock),
+                      suffixIcon: IconButton(
+                        icon: Icon(_confirmPasswordVisible ? Icons.visibility : Icons.visibility_off),
+                        onPressed: () {
+                          setStateDialog(() {
+                            _confirmPasswordVisible = !_confirmPasswordVisible;
+                          });
+                        },
+                      ),
+                    ),
+                    obscureText: !_confirmPasswordVisible,
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Confirm your password';
+                      if (v != newPasswordController.text) return 'Passwords do not match';
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: _isChangingPassword
+                  ? null
+                  : () async {
+                      if (!formKey.currentState!.validate()) return;
+
+                      setStateDialog(() {
+                        _isChangingPassword = true;
+                      });
+
+                      try {
+                        final user = FirebaseAuth.instance.currentUser;
+                        if (user != null) {
+                          // Reauthenticate with current password
+                          final credential = EmailAuthProvider.credential(
+                            email: user.email!,
+                            password: currentPasswordController.text,
+                          );
+                          await user.reauthenticateWithCredential(credential);
+
+                          // Update password
+                          await user.updatePassword(newPasswordController.text);
+
+                          if (context.mounted) {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Password changed successfully'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        }
+                      } on FirebaseAuthException catch (e) {
+                        String errorMessage = 'Failed to change password';
+                        if (e.code == 'wrong-password') {
+                          errorMessage = 'Current password is incorrect';
+                        } else if (e.code == 'weak-password') {
+                          errorMessage = 'New password is too weak';
+                        }
+                        
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(errorMessage),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      } finally {
+                        setStateDialog(() {
+                          _isChangingPassword = false;
+                        });
+                      }
+                    },
+              child: _isChangingPassword
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Change Password'),
+            ),
+          ],
+        );
+      }),
+    );
+  }
+
   void _logout() {
     showDialog(
       context: context,
@@ -48,7 +210,7 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
                 Navigator.of(context).pop();
                 await FirebaseAuth.instance.signOut();
                 if (context.mounted) {
-                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
+                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
                 }
               },
             ),
@@ -234,7 +396,7 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
         title: const Text('Admin Panel', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
         backgroundColor: Theme.of(context).colorScheme.primary,
         elevation: 0,
-        automaticallyImplyLeading: false,
+        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.account_circle, color: Colors.white, size: 28),
@@ -273,6 +435,55 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
             Tab(text: 'Users', icon: Icon(Icons.people)),
             Tab(text: 'Visits', icon: Icon(Icons.location_on)),
             Tab(text: 'Community', icon: Icon(Icons.campaign)),
+          ],
+        ),
+      ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  const CircleAvatar(
+                    radius: 30,
+                    backgroundColor: Colors.white,
+                    child: Icon(Icons.admin_panel_settings, color: Colors.blue, size: 35),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Admin: ${widget.username}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.lock_outline),
+              title: const Text('Change Password'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                _showAdminPasswordChangeDialog();
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: const Text('Logout', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                _logout();
+              },
+            ),
           ],
         ),
       ),

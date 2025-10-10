@@ -95,6 +95,11 @@ class _PendingVisitsScreenState extends State<PendingVisitsScreen> {
       QueryDocumentSnapshot<Map<String, dynamic>> snap) {
     final data = snap.data();
     final associateName = (data['associateName'] ?? 'Unknown').toString();
+    final customerName = (data['customerName'] ?? 'N/A').toString();
+    final upperlineName = (data['upperlineName'] ?? 'N/A').toString();
+    final teamleaderName = (data['teamleaderName'] ?? 'N/A').toString();
+    final reraNumber = (data['reraNumber'] ?? 'N/A').toString();
+    final schemeName = (data['schemeName'] ?? data['scheme'] ?? 'N/A').toString();
     final location = (data['location'] ?? 'N/A').toString();
     final status = (data['status'] ?? 'Pending').toString();
 
@@ -130,11 +135,17 @@ class _PendingVisitsScreenState extends State<PendingVisitsScreen> {
 
     return {
       'associateName': associateName,
+      'customerName': customerName,
+      'upperlineName': upperlineName,
+      'teamleaderName': teamleaderName,
+      'reraNumber': reraNumber,
+      'schemeName': schemeName,
       'location': location,
       'date': dateStr,
       'time': timeStr,
       'status': status,
       'submittedOn': submittedOn,
+      'originalData': data, // Keep original data for detailed view
     };
   }
 

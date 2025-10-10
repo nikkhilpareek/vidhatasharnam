@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'my_home_page.dart';
-import 'admin/admin_panel.dart';
+import 'services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -32,60 +30,41 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Sign in with Firebase Auth
-      UserCredential userCredential = await FirebaseAuth.instance
-          .signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
+      // Use AuthService to sign in
+      await AuthService.instance.signIn(
+        _emailController.text.trim(),
+        _passwordController.text,
       );
 
-      final uid = userCredential.user!.uid;
-
-      // Get user details from Firestore
-      final doc =
-          await FirebaseFirestore.instance.collection('users').doc(uid).get();
-
-      if (!doc.exists) {
-        throw Exception("User record not found in Firestore.");
-      }
-
-      final userData = doc.data()!;
-      final bool isActive = userData['active'] ?? false;
-      final String role =
-          (userData['role'] ?? "user").toString().toLowerCase();
-      final String email = userData['email'] ?? "unknown";
-
-      if (!isActive) {
-        throw Exception("Your account has been deactivated. Contact admin.");
-      }
-
+      // AuthService will handle navigation through AuthWrapper
+      // No need to manually navigate here
       setState(() => _isLoading = false);
-
-      // Navigate based on role
-      if (role == "admin") {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => AdminPanel(username: email.split('@')[0]),
-          ),
-        );
-      } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => MyHomePage(title: "Vidhatasharnam"),
-          ),
-        );
-      }
-    } on FirebaseAuthException catch (e) {
+    } on FirebaseAuthException {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? "Authentication failed")),
+        const SnackBar(
+          content: Text("Password or email is incorrect, please try again"),
+          backgroundColor: Colors.red,
+        ),
       );
     } catch (e) {
       setState(() => _isLoading = false);
+      String errorMessage = e.toString();
+      
+      // Check for specific error messages and customize them
+      if (errorMessage.contains('User account is inactive')) {
+        errorMessage = "Your account has been deactivated. Contact admin.";
+      } else if (errorMessage.contains('User document not found')) {
+        errorMessage = "User record not found. Contact admin.";
+      } else if (errorMessage.contains('Login failed')) {
+        errorMessage = "Login failed. Please try again.";
+      }
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -138,7 +117,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 24),
                     Text(
-                      'VIDHATASHARNAM',
+                      'VIDHATASHARANAM',
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
@@ -146,7 +125,18 @@ class _LoginScreenState extends State<LoginScreen> {
                         letterSpacing: 1.2,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Turning land into legacy',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontStyle: FontStyle.italic,
+                        color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                        letterSpacing: 0.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
                     Text(
                       'Welcome back! Please sign in to continue.',
                       style: TextStyle(

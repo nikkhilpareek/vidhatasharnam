@@ -5,9 +5,10 @@ import 'profile_page.dart';
 import 'total_visits.dart';
 import 'total_gaj_sold.dart';
 import 'community.dart';
-import 'login_screen.dart';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'services/auth_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 
@@ -41,6 +42,16 @@ Future<void> _loadUserData() async {
   }
 }
 
+  // Simple notification state
+  int _notificationCount = 12; // Hardcoded for testing - matches your image
+
+  void _updateNotificationCount() {
+    // You can call this method to update the count
+    setState(() {
+      _notificationCount = _notificationCount > 0 ? 0 : 12;
+    });
+  }
+
   Widget _buildCardButton({
     required String title,
     required IconData icon,
@@ -51,12 +62,12 @@ Future<void> _loadUserData() async {
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.2),
-              spreadRadius: 1,
-              blurRadius: 5,
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 2,
+              blurRadius: 8,
               offset: Offset(0, 2),
             ),
           ],
@@ -76,7 +87,7 @@ Future<void> _loadUserData() async {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey[700],
+                color: Colors.grey.shade800,
               ),
             ),
           ],
@@ -99,11 +110,11 @@ Future<void> _loadUserData() async {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  SizedBox(height: 30,),
+                  SizedBox(height: 20,),
                 Image.asset(
                   'assets/images/logo.png',
                   width: 170,
-                  height: 120,
+                  height: 100,
                   fit: BoxFit.contain,
                   errorBuilder: (context, error, stackTrace) {
                   return Icon(
@@ -113,6 +124,18 @@ Future<void> _loadUserData() async {
                   );
                   },
                 ),
+                SizedBox(height: 8,),
+                Text(
+                  'Turning land into legacy',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.white.withOpacity(0.9),
+                    letterSpacing: 0.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 10,),
               ],
             ),
           ),
@@ -331,7 +354,7 @@ Future<void> _loadUserData() async {
     );
   }
 
-  void _performLogout() {
+  void _performLogout() async {
     // Show loading indicator briefly
     showDialog(
       context: context,
@@ -365,25 +388,34 @@ Future<void> _loadUserData() async {
       },
     );
 
-    // Simulate logout process and navigate to login screen
-    Future.delayed(Duration(seconds: 1), () {
-      Navigator.of(context).pop(); // Close loading dialog
+    try {
+      // Use AuthService to sign out
+      await AuthService.instance.signOut();
       
-      // Navigate to login screen and clear all previous routes
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => LoginScreen()),
-        (Route<dynamic> route) => false,
-      );
+      // Close loading dialog
+      if (Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
       
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Successfully logged out'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    });
+      // AuthService will handle navigation through AuthWrapper
+      // No manual navigation needed
+    } catch (e) {
+      // Close loading dialog
+      if (Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+      
+      // Show error message
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error logging out: $e'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -392,13 +424,29 @@ Future<void> _loadUserData() async {
       key: _scaffoldKey,
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(
-          widget.title,
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 24,
-          ),
-          ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              widget.title,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 24,
+              ),
+            ),
+            Text(
+              "Turning land into legacy",
+              style: TextStyle(
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+                color: Colors.grey.shade600,
+                letterSpacing: 0.3,
+                fontWeight: FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
         actions: <Widget>[
           IconButton(
             onPressed: () {
@@ -532,16 +580,50 @@ Future<void> _loadUserData() async {
             Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                IconButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => CommunityScreen(),
+                Stack(
+                  children: [
+                    IconButton(
+                      onPressed: () {
+                        // Clear notifications when visiting community
+                        setState(() {
+                          _notificationCount = 0;
+                        });
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => CommunityScreen(),
+                          ),
+                        );
+                      },
+                      icon: Icon(Icons.group, size: 26, color: Colors.grey.shade600),
+                    ),
+                    // Simple notification badge - like in your image
+                    if (_notificationCount > 0)
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          constraints: BoxConstraints(
+                            minWidth: 20,
+                            minHeight: 20,
+                          ),
+                          child: Text(
+                            _notificationCount > 99 ? '99+' : _notificationCount.toString(),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
                       ),
-                    );
-                  },
-                  icon: Icon(Icons.group, size: 26, color: Colors.grey.shade600),
+                  ],
                 ),
                 Text(
                   "Community",
