@@ -225,8 +225,6 @@ class _TotalGajSoldScreenState extends State<TotalGajSoldScreen> {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Total Gaj Sold'),
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          foregroundColor: Colors.white,
         ),
         body: const Center(child: Text('Not authenticated')),
       );
@@ -235,9 +233,6 @@ class _TotalGajSoldScreenState extends State<TotalGajSoldScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Total Gaj Sold'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance

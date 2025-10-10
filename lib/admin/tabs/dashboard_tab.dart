@@ -485,7 +485,7 @@ class _AllUsersPerformanceScreenState extends State<AllUsersPerformanceScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('User Performance'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.8),
         foregroundColor: Colors.white,
         elevation: 0,
       ),

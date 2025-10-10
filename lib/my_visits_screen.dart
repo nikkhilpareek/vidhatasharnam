@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'app_theme.dart';
 
 class MyVisitsScreen extends StatefulWidget {
   const MyVisitsScreen({super.key});
@@ -17,8 +18,6 @@ class _MyVisitsScreenState extends State<MyVisitsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("My Visits"),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
       ),
       body: Container(
         color: Colors.grey.shade50,

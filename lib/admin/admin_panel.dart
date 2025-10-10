@@ -394,37 +394,9 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
     return Scaffold(
       appBar: AppBar(
         title: const Text('Admin Panel', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.8),
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.account_circle, color: Colors.white, size: 28),
-            itemBuilder: (context) => <PopupMenuEntry<String>>[
-              PopupMenuItem<String>(
-                enabled: false,
-                value: 'profile',
-                child: Row(children: [
-                  const Icon(Icons.person, size: 20),
-                  const SizedBox(width: 8),
-                  Text('Welcome, ${widget.username}')
-                ]),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem<String>(
-                value: 'logout',
-                child: Row(children: [
-                  Icon(Icons.logout, size: 20, color: Colors.red),
-                  SizedBox(width: 8),
-                  Text('Logout', style: TextStyle(color: Colors.red))
-                ]),
-              ),
-            ],
-            onSelected: (value) {
-              if (value == 'logout') _logout();
-            },
-          ),
-        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,

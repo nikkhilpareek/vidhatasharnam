@@ -29,8 +29,8 @@ class _NewChannelScreenState extends State<NewChannelScreen> {
           TextButton(
             onPressed: _loading ? null : () => _create(uid),
             child: _loading
-                ? const SizedBox(width:16,height:16,child:CircularProgressIndicator(strokeWidth:2,color:Colors.white))
-                : const Text('Create', style: TextStyle(color: Colors.white)),
+                ? const SizedBox(width:16,height:16,child:CircularProgressIndicator(strokeWidth:2,color:Colors.black))
+                : const Text('Create', style: TextStyle(color: Colors.black)),
           )
         ],
         backgroundColor: Theme.of(context).colorScheme.primary,

@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'services/camera_service.dart';
+import 'app_theme.dart';
 
 
 class NewVisitScreen extends StatefulWidget {
@@ -270,8 +271,6 @@ class _NewVisitScreenState extends State<NewVisitScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('New Visit'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),

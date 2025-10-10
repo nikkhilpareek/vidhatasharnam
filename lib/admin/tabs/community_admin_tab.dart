@@ -315,7 +315,7 @@ class _ChannelInfoScreenState extends State<ChannelInfoScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Channel Info'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.8),
         foregroundColor: Colors.white,
         actions: [
           if (_isEditing)

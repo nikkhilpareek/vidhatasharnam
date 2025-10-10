@@ -5,6 +5,7 @@ import 'profile_page.dart';
 import 'total_visits.dart';
 import 'total_gaj_sold.dart';
 import 'community.dart';
+import 'app_theme.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -78,7 +79,7 @@ Future<void> _loadUserData() async {
             Icon(
               icon,
               size: 40,
-              color: Theme.of(context).colorScheme.primary,
+              color: AppTheme.iconColor,
             ),
             SizedBox(height: 12),
             Text(
@@ -105,7 +106,7 @@ Future<void> _loadUserData() async {
             height: 200,
             width: double.infinity,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.inverseSurface,
+              color: Color(0xFFFFF4E8),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -120,7 +121,7 @@ Future<void> _loadUserData() async {
                   return Icon(
                     Icons.business,
                     size: 50,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: AppTheme.iconColor,
                   );
                   },
                 ),
@@ -130,7 +131,7 @@ Future<void> _loadUserData() async {
                   style: TextStyle(
                     fontSize: 12,
                     fontStyle: FontStyle.italic,
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.black.withOpacity(0.9),
                     letterSpacing: 0.5,
                   ),
                   textAlign: TextAlign.center,
@@ -149,7 +150,7 @@ Future<void> _loadUserData() async {
                   ListTile(
                     leading: Icon(
                       Icons.person_outline,
-                      color: Theme.of(context).colorScheme.primary,
+                      color: AppTheme.iconColor,
                       size: 28,
                     ),
                     title: Text(
@@ -173,7 +174,7 @@ Future<void> _loadUserData() async {
                   ExpansionTile(
                     leading: Icon(
                       Icons.business_outlined,
-                      color: Theme.of(context).colorScheme.primary,
+                      color: AppTheme.iconColor,
                       size: 28,
                     ),
                     title: Text(
@@ -187,7 +188,7 @@ Future<void> _loadUserData() async {
                       ListTile(
                         leading: Icon(
                           Icons.web,
-                          color: Theme.of(context).colorScheme.primary,
+                          color: AppTheme.iconColor,
                           size: 24,
                         ),
                         title: Text(
@@ -219,7 +220,7 @@ Future<void> _loadUserData() async {
                   ExpansionTile(
                     leading: Icon(
                       Icons.contact_support_outlined,
-                      color: Theme.of(context).colorScheme.primary,
+                      color: AppTheme.iconColor,
                       size: 28,
                     ),
                     title: Text(
@@ -233,7 +234,7 @@ Future<void> _loadUserData() async {
                       ListTile(
                         leading: Icon(
                           Icons.email_outlined,
-                          color: Theme.of(context).colorScheme.primary,
+                          color: AppTheme.iconColor,
                           size: 20,
                         ),
                         title: Text(
@@ -260,7 +261,7 @@ Future<void> _loadUserData() async {
                       ListTile(
                         leading: Icon(
                           Icons.phone_outlined,
-                          color: Theme.of(context).colorScheme.primary,
+                          color: AppTheme.iconColor,
                           size: 20,
                         ),
                         title: Text(
@@ -423,7 +424,6 @@ Future<void> _loadUserData() async {
     return Scaffold(
       key: _scaffoldKey,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -433,6 +433,7 @@ Future<void> _loadUserData() async {
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 24,
+                color: Colors.black, // Black for main heading
               ),
             ),
             Text(
@@ -440,7 +441,7 @@ Future<void> _loadUserData() async {
               style: TextStyle(
                 fontSize: 12,
                 fontStyle: FontStyle.italic,
-                color: Colors.grey.shade600,
+                color: Colors.black54, // Lighter black for subheading
                 letterSpacing: 0.3,
                 fontWeight: FontWeight.normal,
               ),
@@ -564,7 +565,7 @@ Future<void> _loadUserData() async {
                   onPressed: () {
                     print("Home tapped");
                   },
-                  icon: Icon(Icons.home, size: 26, color: Theme.of(context).colorScheme.primary),
+                  icon: Icon(Icons.home, size: 26, color: AppTheme.iconColor),
                 ),
                 Text(
                   "Home",

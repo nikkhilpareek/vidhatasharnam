@@ -48,8 +48,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Community'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
       ),
       floatingActionButton: _isAdmin
           ? FloatingActionButton(
@@ -325,8 +323,6 @@ class _CommunityChannelScreenState extends State<CommunityChannelScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.channelName),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
         actions: [
           if (widget.isAdmin)
             IconButton(

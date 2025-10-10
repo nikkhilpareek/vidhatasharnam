@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'services/auth_service.dart';
+import 'app_theme.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -109,7 +110,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             return Icon(
                               Icons.business,
                               size: 60,
-                              color: Theme.of(context).colorScheme.primary,
+                              color: AppTheme.iconColor,
                             );
                           },
                         ),

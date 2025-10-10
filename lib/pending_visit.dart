@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:vidhatasharnam/app_theme.dart';
 
 class PendingVisitsScreen extends StatefulWidget {
   const PendingVisitsScreen({super.key});
@@ -66,7 +67,7 @@ class _PendingVisitsScreenState extends State<PendingVisitsScreen> {
           final visits = pendingDocs.map(_mapVisit).toList();
 
           return Container(
-            color: Colors.grey.shade50,
+            color: Color(0xFFFFF4E8),
             child: Column(
               children: [
                 _HeaderInfo(
@@ -151,18 +152,12 @@ class _PendingVisitsScreenState extends State<PendingVisitsScreen> {
 
   AppBar _buildAppBar(BuildContext context) {
     return AppBar(
-      backgroundColor: Theme.of(context).colorScheme.primary,
-      elevation: 0,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white),
-        onPressed: () => Navigator.pop(context),
-      ),
       title: const Text(
         'Pending Visits',
         style: TextStyle(
           fontWeight: FontWeight.w600,
           fontSize: 20,
-          color: Colors.white,
+          color: Colors.black,
         ),
       ),
     );
@@ -235,7 +230,7 @@ class _VisitCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Color(0xFFFFF4E8),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade200),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 2))],
@@ -372,7 +367,7 @@ class _EmptyState extends StatelessWidget {
             onPressed: onCreate,
             style: ElevatedButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Colors.white,
+              foregroundColor: Color(0xFFFFF4E8),
               padding:
                   const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),

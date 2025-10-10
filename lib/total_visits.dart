@@ -26,15 +26,9 @@ class _TotalVisitsScreenState extends State<TotalVisitsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
         title: const Text(
           'Total Visits',
-          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20, color: Colors.white),
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20, color: Colors.black),
         ),
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -78,7 +72,7 @@ class _TotalVisitsScreenState extends State<TotalVisitsScreen> {
               : visits.where((v) => _displayStatus(v['status']) == selectedFilter).toList();
 
           return Container(
-            color: Colors.grey.shade50,
+            color: Color(0xFFFFF4E8),
             child: Column(
               children: [
                 // Header stats

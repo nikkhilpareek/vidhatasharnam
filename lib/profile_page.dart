@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'app_theme.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);
@@ -81,7 +82,7 @@ class _ProfilePageState extends State<ProfilePage> {
             CircleAvatar(
               radius: 50,
               backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-              child: Icon(Icons.person, size: 60, color: Theme.of(context).colorScheme.primary),
+              child: Icon(Icons.person, size: 60, color: AppTheme.iconColor),
             ),
             const SizedBox(height: 12),
             

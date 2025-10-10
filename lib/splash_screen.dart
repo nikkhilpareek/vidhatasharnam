@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_theme.dart';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
@@ -35,7 +36,7 @@ class SplashScreen extends StatelessWidget {
                     return Icon(
                       Icons.business,
                       size: 60,
-                      color: Theme.of(context).colorScheme.primary,
+                      color: AppTheme.iconColor,
                     );
                   },
                 ),
