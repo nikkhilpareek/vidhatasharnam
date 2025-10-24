@@ -1,4 +1,4 @@
-package com.vidhatasharanam.v1
+package com.vidhatasharanam.app
 
 import io.flutter.embedding.android.FlutterActivity
 
