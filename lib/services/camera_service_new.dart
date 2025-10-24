@@ -9,8 +9,19 @@ import '../config/supabase_config.dart';
 
 class CameraService {
   static Future<bool> requestCameraPermission() async {
-    final status = await Permission.camera.request();
-    return status == PermissionStatus.granted;
+    var status = await Permission.camera.status;
+    
+    // If denied, request permission
+    if (status.isDenied) {
+      status = await Permission.camera.request();
+    }
+    
+    return status.isGranted;
+  }
+  
+  static Future<bool> checkCameraPermission() async {
+    final status = await Permission.camera.status;
+    return status.isGranted;
   }
 
   static Future<List<CameraDescription>> getAvailableCameras() async {
@@ -118,11 +129,47 @@ class _CameraScreenState extends State<CameraScreen> {
       debugPrint('🚀 Initializing camera...');
       debugPrint('📱 Platform: ${kIsWeb ? "Web" : Platform.operatingSystem}');
       
-      // Request camera permission
-      final hasPermission = await CameraService.requestCameraPermission();
-      debugPrint('🔐 Camera permission granted: $hasPermission');
+      // Check and request camera permission
+      var cameraStatus = await Permission.camera.status;
       
-      if (!hasPermission) {
+      if (cameraStatus.isDenied) {
+        cameraStatus = await Permission.camera.request();
+      }
+      
+      if (cameraStatus.isPermanentlyDenied) {
+        debugPrint('❌ Camera permission permanently denied');
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Camera Permission Required'),
+              content: const Text(
+                'Camera permission is required to take photos. Please enable it in app settings.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.pop(context);
+                    openAppSettings();
+                  },
+                  child: const Text('Open Settings'),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
+      }
+      
+      if (!cameraStatus.isGranted) {
         debugPrint('❌ Camera permission denied');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -135,6 +182,8 @@ class _CameraScreenState extends State<CameraScreen> {
         }
         return;
       }
+      
+      debugPrint('🔐 Camera permission granted');
 
       // Get front camera
       debugPrint('🔍 Looking for cameras...');

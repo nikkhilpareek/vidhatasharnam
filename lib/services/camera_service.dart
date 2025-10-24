@@ -9,8 +9,19 @@ import '../config/supabase_config.dart';
 
 class CameraService {
   static Future<bool> requestCameraPermission() async {
-    final status = await Permission.camera.request();
-    return status == PermissionStatus.granted;
+    var status = await Permission.camera.status;
+    
+    // If denied, request permission
+    if (status.isDenied) {
+      status = await Permission.camera.request();
+    }
+    
+    return status.isGranted;
+  }
+  
+  static Future<bool> checkCameraPermission() async {
+    final status = await Permission.camera.status;
+    return status.isGranted;
   }
 
   static Future<List<CameraDescription>> getAvailableCameras() async {

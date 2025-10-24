@@ -65,11 +65,50 @@ class _NewVisitScreenState extends State<NewVisitScreen> {
     });
 
     try {
-      // Request location permission
-      final locationPermission = await Permission.location.request();
-      if (locationPermission != PermissionStatus.granted) {
+      // Check current permission status
+      var locationPermission = await Permission.location.status;
+      
+      // If denied, request permission
+      if (locationPermission.isDenied) {
+        locationPermission = await Permission.location.request();
+      }
+      
+      // If permanently denied, show dialog to open settings
+      if (locationPermission.isPermanentlyDenied) {
+        setState(() {
+          _isLoadingLocation = false;
+          _locationController.text = '';
+        });
+        
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Location Permission Required'),
+            content: const Text(
+              'Location permission is required for accurate location detection. Please enable it in app settings.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  openAppSettings();
+                },
+                child: const Text('Open Settings'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+      
+      // If still not granted, show error
+      if (!locationPermission.isGranted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Location permission is required for accurate location detection')),
+          const SnackBar(content: Text('Location permission is required for accurate location detection')),
         );
         setState(() {
           _isLoadingLocation = false;

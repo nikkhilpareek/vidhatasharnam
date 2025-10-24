@@ -126,7 +126,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 icon: const Icon(Icons.save),
                 label: const Text(
                   "Save Changes",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -149,13 +149,16 @@ class _ProfilePageState extends State<ProfilePage> {
 
             SizedBox(
               width: double.infinity,
-              height: 50,
+              height: 55,
               child: ElevatedButton.icon(
                 onPressed: _changePassword,
                 icon: const Icon(Icons.lock_reset),
                 label: const Text(
                   "Change Password",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                 ),
               ),
             ),
