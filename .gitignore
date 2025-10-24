@@ -52,7 +52,3 @@ gradle-wrapper.jar
 /local.properties
 GeneratedPluginRegistrant.java
 
-# Key store files
-key.properties
-*.jks
-*.keystore
