@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'login_screen.dart';
 import 'my_home_page.dart';
 import 'admin/admin_panel.dart';
@@ -16,12 +17,65 @@ class AuthWrapper extends StatefulWidget {
 class _AuthWrapperState extends State<AuthWrapper> {
   late AuthService _authService;
   String? _inactiveMessage;
+  bool _permissionsRequested = false;
 
   @override
   void initState() {
     super.initState();
     _authService = AuthService.instance;
     _authService.addListener(_onAuthStateChanged);
+  }
+
+  Future<void> _requestPermissionsOnce() async {
+    if (_permissionsRequested) return;
+    _permissionsRequested = true;
+
+    // Request location permission
+    var locationStatus = await Permission.location.status;
+    if (!locationStatus.isGranted) {
+      locationStatus = await Permission.location.request();
+      
+      // If permanently denied, show dialog to open settings
+      if (locationStatus.isPermanentlyDenied && mounted) {
+        _showSettingsDialog('Location');
+      }
+    }
+
+    // Request camera permission
+    var cameraStatus = await Permission.camera.status;
+    if (!cameraStatus.isGranted) {
+      cameraStatus = await Permission.camera.request();
+      
+      // If permanently denied, show dialog to open settings
+      if (cameraStatus.isPermanentlyDenied && mounted) {
+        _showSettingsDialog('Camera');
+      }
+    }
+  }
+
+  void _showSettingsDialog(String permissionName) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('$permissionName Permission Required'),
+        content: Text(
+          '$permissionName permission is required for the app to work properly. Please enable it in settings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              openAppSettings();
+            },
+            child: const Text('Open Settings'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -59,6 +113,15 @@ class _AuthWrapperState extends State<AuthWrapper> {
         });
         
         final userData = _authService.userData!;
+        
+        // Request permissions for regular users (non-blocking, happens in background)
+        if (userData.role != "admin") {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _requestPermissionsOnce();
+          });
+        }
+        
+        // Return appropriate screen based on role
         if (userData.role == "admin") {
           return AdminPanel(username: userData.displayName);
         } else {
