@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'admin/tabs/community_admin_tab.dart';
 import 'services/community_notification_service.dart';
@@ -23,7 +24,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
     
     // Mark community notifications as read when opening community screen
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      CommunityNotificationService.instance.markAsRead();
+      final communityService = Provider.of<CommunityNotificationService>(
+        context, 
+        listen: false
+      );
+      communityService.markAsRead();
     });
   }
 

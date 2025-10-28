@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:async';
 
 class CommunityNotificationService extends ChangeNotifier {
   static CommunityNotificationService? _instance;
@@ -12,13 +13,20 @@ class CommunityNotificationService extends ChangeNotifier {
   String? _latestAdminMessage;
   String? _latestChannelName;
   DateTime? _lastChecked;
+  bool _isInitialized = false;
+  
+  // Stream subscriptions for cleanup
+  final List<StreamSubscription> _subscriptions = [];
 
   int get unreadCount => _unreadCount;
   String? get latestAdminMessage => _latestAdminMessage;
   String? get latestChannelName => _latestChannelName;
   bool get hasUnreadMessages => _unreadCount > 0;
+  bool get isInitialized => _isInitialized;
 
   Future<void> initialize() async {
+    if (_isInitialized) return; // Prevent multiple initializations
+    
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
@@ -27,6 +35,36 @@ class CommunityNotificationService extends ChangeNotifier {
     
     // Start listening for new admin messages
     _listenForAdminMessages(user.uid);
+    
+    _isInitialized = true;
+    notifyListeners();
+  }
+
+  void dispose() {
+    // Clean up all stream subscriptions
+    for (final subscription in _subscriptions) {
+      subscription.cancel();
+    }
+    _subscriptions.clear();
+    _isInitialized = false;
+    super.dispose();
+  }
+
+  void reset() {
+    // Cancel all subscriptions
+    for (final subscription in _subscriptions) {
+      subscription.cancel();
+    }
+    _subscriptions.clear();
+    
+    // Reset state
+    _unreadCount = 0;
+    _latestAdminMessage = null;
+    _latestChannelName = null;
+    _lastChecked = null;
+    _isInitialized = false;
+    
+    notifyListeners();
   }
 
   Future<void> _loadLastCheckedTime(String userId) async {
@@ -53,7 +91,7 @@ class CommunityNotificationService extends ChangeNotifier {
 
   void _listenForAdminMessages(String userId) {
     // Listen for channels the user is a member of
-    FirebaseFirestore.instance
+    final channelsSubscription = FirebaseFirestore.instance
         .collection('channels')
         .where('members', arrayContains: userId)
         .snapshots()
@@ -69,7 +107,7 @@ class CommunityNotificationService extends ChangeNotifier {
         final channelName = channelData['name'] ?? 'Unknown Channel';
         
         // Listen for messages in this channel from admin
-        FirebaseFirestore.instance
+        final messagesSubscription = FirebaseFirestore.instance
             .collection('channels')
             .doc(channelDoc.id)
             .collection('messages')
@@ -115,8 +153,14 @@ class CommunityNotificationService extends ChangeNotifier {
             _updateNotificationState(totalUnread, latestMessage, latestChannel);
           }
         });
+        
+        // Add message subscription to cleanup list
+        _subscriptions.add(messagesSubscription);
       }
     });
+    
+    // Add channels subscription to cleanup list
+    _subscriptions.add(channelsSubscription);
   }
 
   void _updateNotificationState(int count, String? message, String? channel) {

@@ -78,8 +78,15 @@ class _AuthWrapperState extends State<AuthWrapper> {
             return const SplashScreen();
           
           case AuthStatus.authenticated:
+            // Initialize community notification service when authenticated
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              CommunityNotificationService.instance.initialize();
+              final communityService = Provider.of<CommunityNotificationService>(
+                context, 
+                listen: false
+              );
+              if (!communityService.isInitialized) {
+                communityService.initialize();
+              }
             });
             
             final userData = authService.userData!;
@@ -97,6 +104,15 @@ class _AuthWrapperState extends State<AuthWrapper> {
             }
           
           case AuthStatus.unauthenticated:
+            // Reset community service on logout
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              final communityService = Provider.of<CommunityNotificationService>(
+                context, 
+                listen: false
+              );
+              communityService.reset();
+            });
+            
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (_inactiveMessage != null && mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(

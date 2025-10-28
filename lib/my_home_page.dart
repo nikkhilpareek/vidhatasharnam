@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'new_visit.dart';
 import 'pending_visit.dart';
 import 'profile_page.dart';
@@ -45,13 +46,6 @@ Future<void> _loadUserData() async {
 
   // Simple notification state
   int _notificationCount = 12; // Hardcoded for testing - matches your image
-
-  void _updateNotificationCount() {
-    // You can call this method to update the count
-    setState(() {
-      _notificationCount = _notificationCount > 0 ? 0 : 12;
-    });
-  }
 
   Widget _buildCardButton({
     required String title,
@@ -390,8 +384,9 @@ Future<void> _loadUserData() async {
     );
 
     try {
-      // Use AuthService to sign out
-      await AuthService.instance.signOut();
+      // Use AuthService to sign out via Provider
+      final authService = Provider.of<AuthService>(context, listen: false);
+      await authService.signOut();
       
       // Close loading dialog
       if (Navigator.canPop(context)) {

@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 
-import '../login_screen.dart';
+import '../services/auth_service.dart';
 import 'tabs/dashboard_tab.dart';
 import 'tabs/users_tab.dart';
 import 'tabs/visits_tab.dart';
@@ -208,10 +209,13 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
               child: const Text('Logout', style: TextStyle(color: Colors.red)),
               onPressed: () async {
                 Navigator.of(context).pop();
-                await FirebaseAuth.instance.signOut();
-                if (context.mounted) {
-                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
-                }
+                
+                // Use AuthService via Provider for logout
+                final authService = Provider.of<AuthService>(context, listen: false);
+                await authService.signOut();
+                
+                // AuthService will handle navigation through AuthWrapper
+                // No manual navigation needed
               },
             ),
           ],

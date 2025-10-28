@@ -20,12 +20,19 @@ class MyApp extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider<AuthService>(
-      create: (_) => AuthService.instance,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthService>(
+          create: (_) => AuthService.instance,
+        ),
+        ChangeNotifierProvider<CommunityNotificationService>(
+          create: (_) => CommunityNotificationService.instance,
+        ),
+      ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'Vidhatasharanam',
-        theme: AppTheme.lightTheme, // Use the theme from app_theme.dart
+        theme: AppTheme.lightTheme,
         home: const AppInitializer(),
       ),
     );
@@ -58,14 +65,17 @@ class _AppInitializerState extends State<AppInitializer> {
       
       // Wait for AuthService to complete initialization
       // This ensures authentication state is determined before navigation
-      final authService = AuthService.instance;
+      final authService = context.read<AuthService>();
       while (!authService.isInitialized) {
         await Future.delayed(const Duration(milliseconds: 50));
       }
       
       // Initialize Community Notification Service if user is authenticated
       if (authService.isAuthenticated) {
-        await CommunityNotificationService.instance.initialize();
+        final communityService = context.read<CommunityNotificationService>();
+        if (!communityService.isInitialized) {
+          await communityService.initialize();
+        }
       }
       
       // Add minimum splash duration for better UX (only if auth check was very fast)
