@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'auth_wrapper.dart';
 import 'splash_screen.dart';
@@ -16,13 +17,17 @@ Future<void> main() async {
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
+  
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Vidhatasharanam',
-      theme: AppTheme.lightTheme, // Use the theme from app_theme.dart
-      home: const AppInitializer(),
+    return ChangeNotifierProvider<AuthService>(
+      create: (_) => AuthService.instance,
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'Vidhatasharanam',
+        theme: AppTheme.lightTheme, // Use the theme from app_theme.dart
+        home: const AppInitializer(),
+      ),
     );
   }
 }
