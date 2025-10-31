@@ -373,9 +373,11 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
                       } catch (e) {
                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
                       } finally {
-                        setState(() {
-                          _creatingUser = false;
-                        });
+                        if (mounted) {
+                          setState(() {
+                            _creatingUser = false;
+                          });
+                        }
                         setStateDialog(() {});
                       }
                     },

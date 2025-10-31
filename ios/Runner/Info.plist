@@ -45,5 +45,17 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>This app requires access to your location even in the background for accurate visit tracking.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app needs your location to automatically detect and record visit locations accurately.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>This app needs your location to automatically detect and record visit locations accurately.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs access to your camera to capture photos for visit documentation.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to your photo library to select photos for visit documentation.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>This app needs access to save photos to your photo library.</string>
 </dict>
 </plist>

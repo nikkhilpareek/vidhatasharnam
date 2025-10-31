@@ -28,7 +28,9 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    if (mounted) {
+      setState(() => _isLoading = true);
+    }
 
     try {
       // Use AuthService to sign in
@@ -39,34 +41,40 @@ class _LoginScreenState extends State<LoginScreen> {
 
       // AuthService will handle navigation through AuthWrapper
       // No need to manually navigate here
-      setState(() => _isLoading = false);
-    } on FirebaseAuthException {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Password or email is incorrect, please try again"),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } catch (e) {
-      setState(() => _isLoading = false);
-      String errorMessage = e.toString();
-      
-      // Check for specific error messages and customize them
-      if (errorMessage.contains('User account is inactive')) {
-        errorMessage = "Your account has been deactivated. Contact admin.";
-      } else if (errorMessage.contains('User document not found')) {
-        errorMessage = "User record not found. Contact admin.";
-      } else if (errorMessage.contains('Login failed')) {
-        errorMessage = "Login failed. Please try again.";
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMessage),
-          backgroundColor: Colors.red,
-        ),
-      );
+    } on FirebaseAuthException {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Password or email is incorrect, please try again"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        String errorMessage = e.toString();
+        
+        // Check for specific error messages and customize them
+        if (errorMessage.contains('User account is inactive')) {
+          errorMessage = "Your account has been deactivated. Contact admin.";
+        } else if (errorMessage.contains('User document not found')) {
+          errorMessage = "User record not found. Contact admin.";
+        } else if (errorMessage.contains('Login failed')) {
+          errorMessage = "Login failed. Please try again.";
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
