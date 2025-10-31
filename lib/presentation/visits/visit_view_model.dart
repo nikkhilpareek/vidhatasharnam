@@ -51,17 +51,18 @@ class VisitViewModel extends BaseViewModel {
     notifyListeners();
 
     try {
-      var locationPermission = await Permission.location.status;
-      if (locationPermission.isDenied) {
-        locationPermission = await Permission.location.request();
+      // Check iOS/Android location permission via Geolocator API
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
       }
-      if (locationPermission.isPermanentlyDenied) {
+      if (permission == LocationPermission.deniedForever) {
         _isLoadingLocation = false;
         locationController.text = '';
         notifyListeners();
         throw const PermissionDeniedException('Location permission permanently denied');
       }
-      if (!locationPermission.isGranted) {
+      if (permission == LocationPermission.denied) {
         _isLoadingLocation = false;
         locationController.text = '';
         notifyListeners();
@@ -217,9 +218,6 @@ class CameraServiceNavigator {
     required String visitId,
     required void Function(String photoUrl) onPhotoTaken,
   }) async {
-    // This method is intended to be implemented by the UI layer using Navigator.
-    // At runtime, the Screen should call VisitViewModel.takePicture and handle navigation.
-    // Here we keep a placeholder to keep VM testable; the UI injects actual navigation.
     throw UnimplementedError('Provide navigation from the UI when calling takePicture');
   }
 }

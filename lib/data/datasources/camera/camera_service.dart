@@ -10,12 +10,9 @@ import 'package:vidhatasharnam/config/supabase_config.dart';
 class CameraService {
   static Future<bool> requestCameraPermission() async {
     var status = await Permission.camera.status;
-    
-    // If denied, request permission
     if (status.isDenied) {
       status = await Permission.camera.request();
     }
-    
     return status.isGranted;
   }
   
@@ -47,7 +44,6 @@ class CameraService {
       }
     }
     
-    // If no front camera found, return the first available camera
     if (cameras.isNotEmpty) {
       debugPrint('⚠️ No front camera found, using first available: ${cameras.first.name}');
       return cameras.first;
@@ -117,7 +113,6 @@ class _CameraScreenState extends State<CameraScreen> {
     if (!kIsWeb) {
       _initializeCamera();
     } else {
-      // On web, we don't need camera initialization
       setState(() {
         _isInitialized = true;
       });
@@ -129,25 +124,43 @@ class _CameraScreenState extends State<CameraScreen> {
       debugPrint('🚀 Initializing camera...');
       debugPrint('📱 Platform: ${kIsWeb ? "Web" : Platform.operatingSystem}');
       
-      // Request camera permission
       final hasPermission = await CameraService.requestCameraPermission();
       debugPrint('🔐 Camera permission granted: $hasPermission');
       
       if (!hasPermission) {
-        debugPrint('❌ Camera permission denied');
+        final status = await Permission.camera.status;
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Camera permission is required to take photos'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          if (status.isPermanentlyDenied) {
+            await showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Camera Permission Required'),
+                content: const Text('Camera access is required to take photos. Please enable it in Settings.'),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      openAppSettings();
+                    },
+                    child: const Text('Open Settings'),
+                  ),
+                ],
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Camera permission is required to take photos'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
           Navigator.pop(context);
         }
         return;
       }
 
-      // Get front camera
       debugPrint('🔍 Looking for cameras...');
       final frontCamera = await CameraService.getFrontCamera();
       
@@ -167,7 +180,6 @@ class _CameraScreenState extends State<CameraScreen> {
       
       debugPrint('📷 Found camera: ${frontCamera.name}, direction: ${frontCamera.lensDirection}');
 
-      // Initialize camera controller
       _controller = CameraController(
         frontCamera,
         ResolutionPreset.high,
@@ -204,7 +216,6 @@ class _CameraScreenState extends State<CameraScreen> {
       Uint8List? imageBytes;
 
       if (kIsWeb) {
-        // ✅ WEB: use file picker
         debugPrint('🌐 Using FilePicker for web');
         final result = await FilePicker.platform.pickFiles(type: FileType.image);
         if (result != null && result.files.single.bytes != null) {
@@ -214,7 +225,6 @@ class _CameraScreenState extends State<CameraScreen> {
           throw Exception('No image selected');
         }
       } else {
-        // ✅ ANDROID/iOS: use Camera
         if (_controller == null || !_controller!.value.isInitialized) {
           throw Exception('Camera not initialized');
         }
@@ -229,7 +239,6 @@ class _CameraScreenState extends State<CameraScreen> {
         throw Exception('Captured image is empty');
       }
 
-      // Upload
       final photoUrl = await CameraService.uploadImageToSupabase(
         fileBytes: imageBytes,
         userId: widget.userId,
@@ -272,13 +281,10 @@ class _CameraScreenState extends State<CameraScreen> {
       body: _isInitialized
           ? Stack(
               children: [
-                // Camera preview (only on mobile)
                 if (!kIsWeb && _controller != null)
                   Positioned.fill(
                     child: CameraPreview(_controller!),
                   ),
-                
-                // Web file picker UI
                 if (kIsWeb)
                   const Center(
                     child: Column(
@@ -294,8 +300,6 @@ class _CameraScreenState extends State<CameraScreen> {
                       ],
                     ),
                   ),
-                
-                // Loading overlay
                 if (_isLoading)
                   Container(
                     color: Colors.black54,
@@ -316,8 +320,6 @@ class _CameraScreenState extends State<CameraScreen> {
                       ),
                     ),
                   ),
-
-                // Camera/Select controls
                 Positioned(
                   bottom: 50,
                   left: 0,
@@ -325,7 +327,6 @@ class _CameraScreenState extends State<CameraScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Capture/Select button
                       GestureDetector(
                         onTap: _isLoading ? null : _takePicture,
                         child: Container(
@@ -355,8 +356,6 @@ class _CameraScreenState extends State<CameraScreen> {
                     ],
                   ),
                 ),
-
-                // Instructions
                 if (!kIsWeb)
                   Positioned(
                     top: 100,
