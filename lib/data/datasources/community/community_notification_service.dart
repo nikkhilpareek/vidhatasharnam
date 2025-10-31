@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import 'package:vidhatasharnam/core/logger/app_logger.dart';
+
 class CommunityNotificationService extends ChangeNotifier {
   static CommunityNotificationService? _instance;
   static CommunityNotificationService get instance => _instance ??= CommunityNotificationService._();
@@ -45,8 +47,12 @@ class CommunityNotificationService extends ChangeNotifier {
       
       // If no last checked time, use current time
       _lastChecked ??= DateTime.now();
-    } catch (e) {
-      print('Error loading last checked time: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error(
+        'Error loading last checked time for user $userId',
+        error: e,
+        stackTrace: stackTrace,
+      );
       _lastChecked = DateTime.now();
     }
   }
@@ -147,8 +153,12 @@ class CommunityNotificationService extends ChangeNotifier {
       _lastChecked = DateTime.now();
       
       notifyListeners();
-    } catch (e) {
-      print('Error marking as read: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error(
+        'Error marking community messages as read for user ${user.uid}',
+        error: e,
+        stackTrace: stackTrace,
+      );
     }
   }
 
@@ -218,8 +228,12 @@ class CommunityNotificationService extends ChangeNotifier {
         }
 
         return totalUnread;
-      } catch (e) {
-        print('Error in getUnreadCountStream: $e');
+      } catch (e, stackTrace) {
+        AppLogger.error(
+          'Error calculating unread count for user $userId',
+          error: e,
+          stackTrace: stackTrace,
+        );
         return 0;
       }
     });

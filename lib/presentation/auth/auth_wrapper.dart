@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'login_screen.dart';
-import 'my_home_page.dart';
-import 'admin/admin_panel.dart';
-import 'splash_screen.dart';
-import 'services/auth_service.dart';
-import 'services/community_notification_service.dart';
+import 'package:provider/provider.dart';
+
+import 'package:vidhatasharnam/admin/admin_panel.dart';
+import 'package:vidhatasharnam/data/datasources/auth/auth_service.dart';
+import 'package:vidhatasharnam/data/datasources/community/community_notification_service.dart';
+import 'package:vidhatasharnam/presentation/auth/login/login_screen.dart';
+import 'package:vidhatasharnam/presentation/home/my_home_page.dart';
+import 'package:vidhatasharnam/presentation/splash/splash_screen.dart';
 
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});

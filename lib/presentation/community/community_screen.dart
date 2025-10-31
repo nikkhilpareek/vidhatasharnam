@@ -2,8 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import 'admin/tabs/community_admin_tab.dart';
-import 'services/community_notification_service.dart';
+import 'package:vidhatasharnam/admin/tabs/community_admin_tab.dart';
+import 'package:vidhatasharnam/data/datasources/community/community_notification_service.dart';
 
 class CommunityScreen extends StatefulWidget {
   const CommunityScreen({super.key});

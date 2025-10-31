@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'services/auth_service.dart';
-import 'app_theme.dart';
+import 'package:provider/provider.dart';
+
+import 'package:vidhatasharnam/core/theme/app_theme.dart';
+import 'package:vidhatasharnam/presentation/auth/login/login_view_model.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,7 +17,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   bool _isPasswordVisible = false;
-  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -28,58 +28,28 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (mounted) {
-      setState(() => _isLoading = true);
-    }
+    final loginViewModel = context.read<LoginViewModel>();
+    final success = await loginViewModel.login(
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+    );
 
-    try {
-      // Use AuthService to sign in
-      await AuthService.instance.signIn(
-        _emailController.text.trim(),
-        _passwordController.text,
-      );
+    if (!mounted || success) return;
 
-      // AuthService will handle navigation through AuthWrapper
-      // No need to manually navigate here
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    } on FirebaseAuthException {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Password or email is incorrect, please try again"),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        String errorMessage = e.toString();
-        
-        // Check for specific error messages and customize them
-        if (errorMessage.contains('User account is inactive')) {
-          errorMessage = "Your account has been deactivated. Contact admin.";
-        } else if (errorMessage.contains('User document not found')) {
-          errorMessage = "User record not found. Contact admin.";
-        } else if (errorMessage.contains('Login failed')) {
-          errorMessage = "Login failed. Please try again.";
-        }
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+    final errorMessage =
+        loginViewModel.errorMessage ?? 'Unable to sign in. Please try again.';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(errorMessage),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final isLoading = context.select<LoginViewModel, bool>((vm) => vm.isLoading);
+
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       body: SafeArea(
@@ -140,7 +110,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: TextStyle(
                         fontSize: 14,
                         fontStyle: FontStyle.italic,
-                        color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withOpacity(0.8),
                         letterSpacing: 0.5,
                       ),
                       textAlign: TextAlign.center,
@@ -201,8 +174,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                 : Icons.visibility,
                           ),
                           onPressed: () {
-                            setState(() =>
-                                _isPasswordVisible = !_isPasswordVisible);
+                            setState(
+                              () => _isPasswordVisible = !_isPasswordVisible,
+                            );
                           },
                         ),
                         border: OutlineInputBorder(
@@ -222,7 +196,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     SizedBox(
                       height: 56,
                       child: ElevatedButton(
-                        onPressed: _isLoading ? null : _login,
+                        onPressed: isLoading ? null : _login,
                         style: ElevatedButton.styleFrom(
                           backgroundColor:
                               Theme.of(context).colorScheme.primary,
@@ -232,7 +206,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           elevation: 2,
                         ),
-                        child: _isLoading
+                        child: isLoading
                             ? const Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
@@ -273,3 +247,4 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+

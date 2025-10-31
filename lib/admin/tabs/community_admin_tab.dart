@@ -3,8 +3,9 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-import '../../services/community/new_channel_screen.dart';
-import '../../community.dart';
+import 'package:vidhatasharnam/presentation/community/new_channel_screen.dart';
+
+import '../../presentation/community/community_screen.dart';
 
 class CommunityAdminTab extends StatelessWidget {
   const CommunityAdminTab({super.key});

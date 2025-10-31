@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 
+import 'package:vidhatasharnam/core/logger/app_logger.dart';
+
 enum AuthStatus {
   unknown,
   authenticated,
@@ -88,8 +90,12 @@ class AuthService extends ChangeNotifier {
         // No valid session found
         await _clearSession();
       }
-    } catch (e) {
-      print('Error checking existing session: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error(
+        'Error checking existing session',
+        error: e,
+        stackTrace: stackTrace,
+      );
       await _clearSession();
     }
 
@@ -136,10 +142,14 @@ class AuthService extends ChangeNotifier {
       _status = AuthStatus.authenticated;
       notifyListeners();
 
-    } catch (e) {
-      print('Error verifying user data: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error(
+        'Error verifying user data for user ${user.uid}',
+        error: e,
+        stackTrace: stackTrace,
+      );
       await _clearSession();
-      throw e;
+      rethrow;
     }
   }
 
@@ -148,8 +158,12 @@ class AuthService extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_lastLoginKey, DateTime.now().toIso8601String());
       await prefs.setString(_userDataKey, userData.uid); // Just store reference
-    } catch (e) {
-      print('Error saving user session: $e');
+    } catch (e, stackTrace) {
+      AppLogger.warning(
+        'Error saving user session for user ${userData.uid}',
+        error: e,
+        stackTrace: stackTrace,
+      );
     }
   }
 
@@ -158,8 +172,12 @@ class AuthService extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_lastLoginKey);
       await prefs.remove(_userDataKey);
-    } catch (e) {
-      print('Error clearing session: $e');
+    } catch (e, stackTrace) {
+      AppLogger.warning(
+        'Error clearing session data',
+        error: e,
+        stackTrace: stackTrace,
+      );
     }
 
     _userData = null;
@@ -183,7 +201,12 @@ class AuthService extends ChangeNotifier {
       }
 
       // _onAuthStateChanged will handle the rest
-    } catch (e) {
+    } catch (e, stackTrace) {
+      AppLogger.error(
+        'Error during sign in for $email',
+        error: e,
+        stackTrace: stackTrace,
+      );
       _status = AuthStatus.unauthenticated;
       notifyListeners();
       rethrow;
@@ -194,8 +217,12 @@ class AuthService extends ChangeNotifier {
     try {
       await FirebaseAuth.instance.signOut();
       await _clearSession();
-    } catch (e) {
-      print('Error signing out: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error(
+        'Error signing out',
+        error: e,
+        stackTrace: stackTrace,
+      );
       // Force clear session even if Firebase signOut fails
       await _clearSession();
     }
@@ -206,8 +233,12 @@ class AuthService extends ChangeNotifier {
     
     try {
       await _verifyAndSetUserData(_firebaseUser!);
-    } catch (e) {
-      print('Error refreshing user data: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error(
+        'Error refreshing user data',
+        error: e,
+        stackTrace: stackTrace,
+      );
       // If refresh fails, sign out user
       await signOut();
     }

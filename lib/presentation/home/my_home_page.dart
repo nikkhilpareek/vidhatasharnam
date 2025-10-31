@@ -1,16 +1,17 @@
-import 'package:flutter/material.dart';
-import 'new_visit.dart';
-import 'pending_visit.dart';
-import 'profile_page.dart';
-import 'total_visits.dart';
-import 'total_gaj_sold.dart';
-import 'community.dart';
-import 'app_theme.dart';
-
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'services/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import 'package:vidhatasharnam/core/logger/app_logger.dart';
+import 'package:vidhatasharnam/core/theme/app_theme.dart';
+import 'package:vidhatasharnam/data/datasources/auth/auth_service.dart';
+import 'package:vidhatasharnam/presentation/community/community_screen.dart';
+import 'package:vidhatasharnam/presentation/profile/profile_page.dart';
+import 'package:vidhatasharnam/presentation/visits/new_visit.dart';
+import 'package:vidhatasharnam/presentation/visits/pending_visit.dart';
+import 'package:vidhatasharnam/presentation/visits/total_gaj_sold.dart';
+import 'package:vidhatasharnam/presentation/visits/total_visits.dart';
 
 
 class MyHomePage extends StatefulWidget {
@@ -563,7 +564,7 @@ Future<void> _loadUserData() async {
               children: [
                 IconButton(
                   onPressed: () {
-                    print("Home tapped");
+                    AppLogger.debug('Home tab tapped');
                   },
                   icon: Icon(Icons.home, size: 26, color: AppTheme.iconColor),
                 ),

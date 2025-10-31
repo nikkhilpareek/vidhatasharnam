@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../login_screen.dart';
+import '../presentation/auth/login/login_screen.dart';
 import 'tabs/dashboard_tab.dart';
 import 'tabs/users_tab.dart';
 import 'tabs/visits_tab.dart';

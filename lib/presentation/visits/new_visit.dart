@@ -4,8 +4,9 @@ import 'package:geocoding/geocoding.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'services/camera_service.dart';
-import 'app_theme.dart';
+import 'package:vidhatasharnam/data/datasources/camera/camera_service.dart';
+
+import 'package:vidhatasharnam/core/logger/app_logger.dart';
 
 
 class NewVisitScreen extends StatefulWidget {
@@ -185,11 +186,15 @@ class _NewVisitScreenState extends State<NewVisitScreen> {
           _isLoadingLocation = false;
         });
         
-        print('Precise location detected: $preciseLocation');
-        print('Accuracy: ${position.accuracy} meters');
+        AppLogger.info('Precise location detected: $preciseLocation');
+        AppLogger.info('Location accuracy: ${position.accuracy} meters');
       }
-    } catch (e) {
-      print('Error getting precise location: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error(
+        'Error getting precise location',
+        error: e,
+        stackTrace: stackTrace,
+      );
       setState(() {
         _isLoadingLocation = false;
         _locationController.text = '';
@@ -236,8 +241,12 @@ class _NewVisitScreenState extends State<NewVisitScreen> {
           ),
         ),
       );
-    } catch (e) {
-      print('Error opening camera: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error(
+        'Error opening camera',
+        error: e,
+        stackTrace: stackTrace,
+      );
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to open camera')),
       );
@@ -286,8 +295,12 @@ class _NewVisitScreenState extends State<NewVisitScreen> {
       );
 
       Navigator.pop(context);
-    } catch (e) {
-      print("Error submitting visit: $e");
+    } catch (e, stackTrace) {
+      AppLogger.error(
+        'Error submitting visit data',
+        error: e,
+        stackTrace: stackTrace,
+      );
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to submit visit. Please try again.'),

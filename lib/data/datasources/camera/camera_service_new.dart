@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:file_picker/file_picker.dart';
-import '../config/supabase_config.dart';
+import 'package:vidhatasharnam/config/supabase_config.dart';
 
 class CameraService {
   static Future<bool> requestCameraPermission() async {
