@@ -42,14 +42,13 @@ class AuthService extends ChangeNotifier {
   static AuthService? _instance;
   static AuthService get instance => _instance ??= AuthService._();
 
-  AuthService._() {
-    _init();
-  }
+  AuthService._();
 
   AuthStatus _status = AuthStatus.unknown;
   UserData? _userData;
   User? _firebaseUser;
   bool _isInitialized = false;
+  bool _initStarted = false;
 
   AuthStatus get status => _status;
   UserData? get userData => _userData;
@@ -60,14 +59,17 @@ class AuthService extends ChangeNotifier {
   static const String _lastLoginKey = 'last_successful_login';
   static const String _userDataKey = 'cached_user_data';
 
+  Future<void> init() async {
+    if (_initStarted) return;
+    _initStarted = true;
+    await _init();
+  }
+
   Future<void> _init() async {
     _status = AuthStatus.loading;
     notifyListeners();
 
-    // Listen to Firebase auth state changes
     FirebaseAuth.instance.authStateChanges().listen(_onAuthStateChanged);
-
-    // Check for existing session
     await _checkExistingSession();
   }
 
@@ -77,17 +79,13 @@ class AuthService extends ChangeNotifier {
       final lastLogin = prefs.getString(_lastLoginKey);
       final cachedUserData = prefs.getString(_userDataKey);
 
-      // Get current Firebase user
       final currentUser = FirebaseAuth.instance.currentUser;
 
       if (currentUser != null && lastLogin != null) {
-        // User exists in Firebase Auth, verify with Firestore
         await _verifyAndSetUserData(currentUser);
       } else if (cachedUserData != null && currentUser != null) {
-        // Fallback to cached data while verifying
         await _verifyAndSetUserData(currentUser);
       } else {
-        // No valid session found
         await _clearSession();
       }
     } catch (e, stackTrace) {
@@ -109,7 +107,6 @@ class AuthService extends ChangeNotifier {
     if (user == null) {
       await _clearSession();
     } else if (_status != AuthStatus.authenticated) {
-      // User signed in, verify their data
       await _verifyAndSetUserData(user);
     }
   }
@@ -128,13 +125,11 @@ class AuthService extends ChangeNotifier {
       final userData = UserData.fromFirestore(user.uid, userDoc.data()!);
 
       if (!userData.isActive) {
-        // Sign out inactive user and notify UI
         await FirebaseAuth.instance.signOut();
         await _clearSession();
         throw Exception('User account is inactive');
       }
 
-      // Save successful login
       await _saveUserSession(userData);
       
       _userData = userData;
@@ -157,7 +152,7 @@ class AuthService extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_lastLoginKey, DateTime.now().toIso8601String());
-      await prefs.setString(_userDataKey, userData.uid); // Just store reference
+      await prefs.setString(_userDataKey, userData.uid);
     } catch (e, stackTrace) {
       AppLogger.warning(
         'Error saving user session for user ${userData.uid}',
@@ -200,7 +195,6 @@ class AuthService extends ChangeNotifier {
         throw Exception('Login failed');
       }
 
-      // _onAuthStateChanged will handle the rest
     } catch (e, stackTrace) {
       AppLogger.error(
         'Error during sign in for $email',
@@ -223,7 +217,6 @@ class AuthService extends ChangeNotifier {
         error: e,
         stackTrace: stackTrace,
       );
-      // Force clear session even if Firebase signOut fails
       await _clearSession();
     }
   }
@@ -239,7 +232,6 @@ class AuthService extends ChangeNotifier {
         error: e,
         stackTrace: stackTrace,
       );
-      // If refresh fails, sign out user
       await signOut();
     }
   }

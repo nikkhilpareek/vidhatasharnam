@@ -53,6 +53,8 @@ class AuthRepositoryImpl implements AuthRepository {
           return const NetworkException('Too many unsuccessful attempts. Please wait and try again later.');
         case 'invalid-email':
           return const ValidationException('The email address is invalid. Check the format and try again.');
+        case 'network-request-failed':
+          return const NetworkException('Network error. Check your internet connection and try again.');
         default:
           return UnknownAppException(error.message ?? 'Authentication failed', stackTrace: stackTrace);
       }

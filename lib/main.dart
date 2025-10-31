@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'firebase_options.dart';
 import 'package:vidhatasharnam/presentation/auth/auth_wrapper.dart';
@@ -18,35 +19,38 @@ import 'package:vidhatasharnam/domain/repositories/auth_repository.dart';
 import 'package:vidhatasharnam/presentation/auth/login/login_view_model.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  await runZonedGuarded<Future<void>>(() async {
+    WidgetsFlutterBinding.ensureInitialized();
 
-  FlutterError.onError = (FlutterErrorDetails details) {
-    AppLogger.critical(
-      'Uncaught Flutter framework error',
-      error: details.exception,
-      stackTrace: details.stack,
-    );
-  };
-
-  WidgetsBinding.instance.platformDispatcher.onError = (error, stackTrace) {
-    AppLogger.critical(
-      'Uncaught platform error',
-      error: error,
-      stackTrace: stackTrace,
-    );
-    return true;
-  };
-  
-  runZonedGuarded(
-    () => runApp(const MyApp()),
-    (error, stackTrace) {
+    // Configure global error handlers inside the same zone
+    FlutterError.onError = (FlutterErrorDetails details) {
       AppLogger.critical(
-        'Uncaught zone error',
+        'Uncaught Flutter framework error',
+        error: details.exception,
+        stackTrace: details.stack,
+      );
+    };
+
+    WidgetsBinding.instance.platformDispatcher.onError = (error, stackTrace) {
+      AppLogger.critical(
+        'Uncaught platform error',
         error: error,
         stackTrace: stackTrace,
       );
-    },
-  );
+      return true;
+    };
+
+    // Avoid runtime font fetches (works offline; falls back if not bundled)
+    GoogleFonts.config.allowRuntimeFetching = false;
+
+    runApp(const MyApp());
+  }, (error, stackTrace) {
+    AppLogger.critical(
+      'Uncaught zone error',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  });
 }
 
 class MyApp extends StatelessWidget {
@@ -89,7 +93,7 @@ class _AppInitializerState extends State<AppInitializer> {
   @override
   void initState() {
     super.initState();
-    // Schedule the initialization after the first frame is built
+    // Initialize after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeApp();
     });
@@ -97,30 +101,25 @@ class _AppInitializerState extends State<AppInitializer> {
 
   Future<void> _initializeApp() async {
     try {
-      // Initialize Firebase first
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
+
+      await AuthService.instance.init();
       
-      // Initialize Supabase
       await SupabaseConfig.initialize();
       
-      // Wait for AuthService to complete initialization
-      // This ensures authentication state is determined before navigation
       final authService = AuthService.instance;
       while (!authService.isInitialized) {
         await Future.delayed(const Duration(milliseconds: 50));
       }
       
-      // Initialize Community Notification Service if user is authenticated
       if (authService.isAuthenticated) {
         await CommunityNotificationService.instance.initialize();
       }
       
-      // Add minimum splash duration for better UX (only if auth check was very fast)
       await Future.delayed(const Duration(milliseconds: 800));
       
-      // Navigate to AuthWrapper after all initialization is complete
       if (mounted) {
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
@@ -138,8 +137,6 @@ class _AppInitializerState extends State<AppInitializer> {
         error: e,
         stackTrace: stackTrace,
       );
-      // If initialization fails, still navigate to AuthWrapper
-      // AuthWrapper will handle auth errors gracefully
       if (mounted) {
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(

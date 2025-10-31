@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'app_colors.dart';
 
@@ -22,52 +21,52 @@ class AppTheme {
 
   static Color get _textColor => AppColors.textColor;
 
-  static TextStyle get headingLarge => GoogleFonts.poppins(
+  static TextStyle get headingLarge => const TextStyle(
         fontSize: 24,
         fontWeight: FontWeight.w700,
-        color: _textColor,
+        color: AppColors.textColor,
       );
 
-  static TextStyle get headingMedium => GoogleFonts.poppins(
+  static TextStyle get headingMedium => const TextStyle(
         fontSize: 20,
         fontWeight: FontWeight.w600,
-        color: _textColor,
+        color: AppColors.textColor,
       );
 
-  static TextStyle get headingSmall => GoogleFonts.poppins(
+  static TextStyle get headingSmall => const TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.w600,
-        color: _textColor,
+        color: AppColors.textColor,
       );
 
-  static TextStyle get bodyLarge => GoogleFonts.poppins(
+  static TextStyle get bodyLarge => const TextStyle(
         fontSize: 16,
         fontWeight: FontWeight.w400,
-        color: _textColor,
+        color: AppColors.textColor,
       );
 
-  static TextStyle get bodyMedium => GoogleFonts.poppins(
+  static TextStyle get bodyMedium => const TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w400,
-        color: _textColor,
+        color: AppColors.textColor,
       );
 
-  static TextStyle get bodySmall => GoogleFonts.poppins(
+  static TextStyle get bodySmall => const TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w400,
-        color: _textColor,
+        color: AppColors.textColor,
       );
 
-  static TextStyle get labelLarge => GoogleFonts.poppins(
+  static TextStyle get labelLarge => const TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w600,
-        color: _textColor,
+        color: AppColors.textColor,
       );
 
-  static TextStyle get labelMedium => GoogleFonts.poppins(
+  static TextStyle get labelMedium => const TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w600,
-        color: _textColor,
+        color: AppColors.textColor,
       );
 
   static ThemeData get lightTheme => ThemeData(
@@ -107,7 +106,7 @@ class AppTheme {
           foregroundColor: Colors.black,
           elevation: 0,
           centerTitle: true,
-          titleTextStyle: GoogleFonts.poppins(
+          titleTextStyle: const TextStyle(
             color: Colors.black,
             fontSize: 20,
             fontWeight: FontWeight.w600,
@@ -119,7 +118,7 @@ class AppTheme {
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primaryColor,
             foregroundColor: Colors.white,
-            textStyle: GoogleFonts.poppins(
+            textStyle: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
             ),
@@ -133,7 +132,7 @@ class AppTheme {
         textButtonTheme: TextButtonThemeData(
           style: TextButton.styleFrom(
             foregroundColor: AppColors.primaryColor,
-            textStyle: GoogleFonts.poppins(
+            textStyle: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
@@ -146,7 +145,7 @@ class AppTheme {
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
             foregroundColor: AppColors.primaryColor,
-            textStyle: GoogleFonts.poppins(
+            textStyle: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
@@ -181,19 +180,19 @@ class AppTheme {
             borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(color: AppColors.primaryColor, width: 2),
           ),
-          errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.errorColor, width: 1.5),
+          errorBorder: const OutlineInputBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+            borderSide: BorderSide(color: AppColors.errorColor, width: 1.5),
           ),
-          focusedErrorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.errorColor, width: 2),
+          focusedErrorBorder: const OutlineInputBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+            borderSide: BorderSide(color: AppColors.errorColor, width: 2),
           ),
-          labelStyle: GoogleFonts.poppins(
+          labelStyle: TextStyle(
             fontSize: 14,
             color: _textColor.withOpacity(0.7),
           ),
-          hintStyle: GoogleFonts.poppins(
+          hintStyle: TextStyle(
             fontSize: 14,
             color: _textColor.withOpacity(0.5),
           ),
@@ -211,41 +210,41 @@ class AppTheme {
           color: AppColors.iconColor,
           size: 24,
         ),
-        dialogTheme: DialogThemeData(
+        dialogTheme:  DialogThemeData(
           backgroundColor: AppColors.surfaceColor,
           elevation: 8,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          titleTextStyle: GoogleFonts.poppins(
+          titleTextStyle: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: _textColor,
+            color: AppColors.textColor,
           ),
-          contentTextStyle: GoogleFonts.poppins(
+          contentTextStyle: TextStyle(
             fontSize: 14,
-            color: _textColor,
+            color: AppColors.textColor,
           ),
         ),
         bottomNavigationBarTheme: BottomNavigationBarThemeData(
           backgroundColor: AppColors.surfaceColor,
           selectedItemColor: AppColors.primaryColor,
           unselectedItemColor: Colors.grey.shade600,
-          selectedLabelStyle: GoogleFonts.poppins(
+          selectedLabelStyle: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),
-          unselectedLabelStyle: GoogleFonts.poppins(
+          unselectedLabelStyle: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w400,
           ),
           type: BottomNavigationBarType.fixed,
           elevation: 8,
         ),
-        drawerTheme: DrawerThemeData(
+        drawerTheme: const DrawerThemeData(
           backgroundColor: AppColors.surfaceColor,
           elevation: 8,
-          shape: const RoundedRectangleBorder(
+          shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.only(
               topRight: Radius.circular(16),
               bottomRight: Radius.circular(16),
@@ -269,7 +268,7 @@ class AppTheme {
         chipTheme: ChipThemeData(
           backgroundColor: Colors.grey.shade100,
           selectedColor: AppColors.primaryColor.withOpacity(0.2),
-          labelStyle: GoogleFonts.poppins(fontSize: 12),
+          labelStyle: const TextStyle(fontSize: 12, color: AppColors.textColor),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
@@ -280,12 +279,12 @@ class AppTheme {
   static ThemeData get darkTheme => lightTheme.copyWith(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF121212),
-        colorScheme: ColorScheme.dark(
+        colorScheme: const ColorScheme.dark(
           primary: AppColors.primaryColor,
           secondary: AppColors.secondaryColor,
           tertiary: AppColors.accentColor,
-          background: const Color(0xFF121212),
-          surface: const Color(0xFF1E1E1E),
+          background: Color(0xFF121212),
+          surface: Color(0xFF1E1E1E),
           error: AppColors.errorColor,
           onPrimary: Colors.white,
           onSecondary: Colors.white,

@@ -1,27 +1,33 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-class VisitsTab extends StatefulWidget {
+import 'visits_view_model.dart';
+
+class VisitsTab extends StatelessWidget {
   final String? initialFilter;
   const VisitsTab({super.key, this.initialFilter});
 
   @override
-  State<VisitsTab> createState() => _VisitsTabState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider<VisitsViewModel>(
+      create: (_) {
+        final vm = VisitsViewModel();
+        if (initialFilter != null) vm.setStatusFilter(initialFilter!);
+        return vm;
+      },
+      child: const _VisitsView(),
+    );
+  }
 }
 
-class _VisitsTabState extends State<VisitsTab> {
-  late String _visitStatusFilter;
-  String _visitSearchQuery = '';
-  Map<String, int> _statusChipCounts = {'Pending': 0, 'Approved': 0, 'Rejected': 0};
-
-  @override
-  void initState() {
-    super.initState();
-    _visitStatusFilter = widget.initialFilter ?? 'All';
-  }
+class _VisitsView extends StatelessWidget {
+  const _VisitsView();
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<VisitsViewModel>();
+
     return Container(
       color: Colors.grey.shade50,
       child: Column(
@@ -54,20 +60,10 @@ class _VisitsTabState extends State<VisitsTab> {
                       borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.2),
                     ),
                   ),
-                  onChanged: (v) => setState(() => _visitSearchQuery = v.trim().toLowerCase()),
+                  onChanged: vm.setSearchQuery,
                 ),
                 const SizedBox(height: 12),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _buildStatusChip('All'),
-                      _buildStatusChip('Pending', color: Colors.orange),
-                      _buildStatusChip('Approved', color: Colors.green),
-                      _buildStatusChip('Rejected', color: Colors.red),
-                    ],
-                  ),
-                ),
+                _StatusChips(),
               ],
             ),
           ),
@@ -103,22 +99,12 @@ class _VisitsTabState extends State<VisitsTab> {
                     }
 
                     final allDocs = visitsSnap.data!.docs;
-                    final countPending = allDocs.where((d) => (d['status'] ?? '') == 'Pending').length;
-                    final countApproved = allDocs.where((d) => (d['status'] ?? '') == 'Approved').length;
-                    final countRejected = allDocs.where((d) => (d['status'] ?? '') == 'Rejected').length;
-
-                    _statusChipCounts = {
-                      'Pending': countPending,
-                      'Approved': countApproved,
-                      'Rejected': countRejected,
-                    };
 
                     Iterable<QueryDocumentSnapshot> filtered = allDocs;
-                    if (_visitStatusFilter != 'All') {
-                      filtered = filtered.where((d) => (d['status'] ?? '') == _visitStatusFilter);
+                    if (vm.statusFilter != 'All') {
+                      filtered = filtered.where((d) => (d['status'] ?? '') == vm.statusFilter);
                     }
-
-                    if (_visitSearchQuery.isNotEmpty) {
+                    if (vm.searchQuery.isNotEmpty) {
                       filtered = filtered.where((d) {
                         final data = d.data() as Map<String, dynamic>;
                         final userId = data['userId'] ?? '';
@@ -130,21 +116,22 @@ class _VisitsTabState extends State<VisitsTab> {
                         final rera = (data['reraNumber'] ?? '').toString().toLowerCase();
                         final schemeName = (data['schemeName'] ?? '').toString().toLowerCase();
                         final location = (data['location'] ?? '').toString().toLowerCase();
-                        return username.contains(_visitSearchQuery) ||
-                            associate.contains(_visitSearchQuery) ||
-                            customer.contains(_visitSearchQuery) ||
-                            upperline.contains(_visitSearchQuery) ||
-                            teamleader.contains(_visitSearchQuery) ||
-                            rera.contains(_visitSearchQuery) ||
-                            schemeName.contains(_visitSearchQuery) ||
-                            location.contains(_visitSearchQuery);
+                        final q = vm.searchQuery;
+                        return username.contains(q) ||
+                            associate.contains(q) ||
+                            customer.contains(q) ||
+                            upperline.contains(q) ||
+                            teamleader.contains(q) ||
+                            rera.contains(q) ||
+                            schemeName.contains(q) ||
+                            location.contains(q);
                       });
                     }
 
                     final filteredList = filtered.toList();
                     if (filteredList.isEmpty) {
                       return Center(
-                        child: Text('No ${_visitStatusFilter == 'All' ? '' : _visitStatusFilter.toLowerCase()} visits match your search.'),
+                        child: Text('No ${vm.statusFilter == 'All' ? '' : vm.statusFilter.toLowerCase()} visits match your search.'),
                       );
                     }
 
@@ -160,7 +147,7 @@ class _VisitsTabState extends State<VisitsTab> {
                           visit: data,
                           userNameMap: userNameMap,
                           onUpdateStatus: _updateVisitStatus,
-                          onAssignScheme: _showAssignSchemeDialog,
+                          onAssignScheme: (id, scheme) => _showAssignSchemeDialog(id, scheme, context),
                         );
                       },
                     );
@@ -174,33 +161,11 @@ class _VisitsTabState extends State<VisitsTab> {
     );
   }
 
-  Widget _buildStatusChip(String label, {Color? color}) {
-    final isSelected = _visitStatusFilter == label;
-    String display = label;
-    if (label != 'All' && _statusChipCounts.containsKey(label)) {
-      display = '$label (${_statusChipCounts[label]})';
-    }
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: ChoiceChip(
-        label: Text(display),
-        selected: isSelected,
-        selectedColor: (color ?? Theme.of(context).colorScheme.primary).withOpacity(0.15),
-        labelStyle: TextStyle(
-          color: isSelected ? (color ?? Theme.of(context).colorScheme.primary) : Colors.grey.shade700,
-          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-        ),
-        side: BorderSide(color: isSelected ? (color ?? Theme.of(context).colorScheme.primary) : Colors.grey.shade300),
-        onSelected: (_) => setState(() => _visitStatusFilter = label),
-      ),
-    );
-  }
-
   Future<void> _updateVisitStatus(String visitId, String newStatus) async {
     await FirebaseFirestore.instance.collection('visits').doc(visitId).update({'status': newStatus});
   }
 
-  void _showAssignSchemeDialog(String visitId, String? existingScheme) {
+  void _showAssignSchemeDialog(String visitId, String? existingScheme, BuildContext context) {
     final schemeNameController = TextEditingController();
     final plotNumberController = TextEditingController();
     final clientNameController = TextEditingController();
@@ -216,8 +181,6 @@ class _VisitsTabState extends State<VisitsTab> {
           builder: (context, snap) {
             if (snap.hasData) {
               final data = snap.data!.data() as Map<String, dynamic>? ?? {};
-              
-              // Pre-populate fields with existing data or defaults
               if (schemeNameController.text.isEmpty) {
                 schemeNameController.text = data['schemeName'] ?? data['scheme'] ?? existingScheme ?? '';
               }
@@ -291,28 +254,26 @@ class _VisitsTabState extends State<VisitsTab> {
                     final plotNumber = plotNumberController.text.trim();
                     final clientName = clientNameController.text.trim();
                     final gajSoldText = gajSoldController.text.trim();
-                    
-                    // Validation
+
                     if (schemeName.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text("Please enter scheme name")),
                       );
                       return;
                     }
-                    
-                    // Convert gajSold to number, default to 0 if invalid
+
                     final gajSoldNumber = int.tryParse(gajSoldText) ?? 0;
-                    
+
                     try {
                       await FirebaseFirestore.instance.collection('visits').doc(visitId).update({
                         'schemeName': schemeName,
                         'plotNumber': plotNumber,
                         'clientName': clientName,
                         'gajSold': gajSoldNumber,
-                        'scheme': schemeName, // Keep for backward compatibility
+                        'scheme': schemeName,
                         'updatedAt': FieldValue.serverTimestamp(),
                       });
-                      
+
                       if (!context.mounted) return;
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -332,6 +293,43 @@ class _VisitsTabState extends State<VisitsTab> {
           },
         );
       },
+    );
+  }
+}
+
+class _StatusChips extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final vm = context.watch<VisitsViewModel>();
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _buildStatusChip(context, 'All'),
+          _buildStatusChip(context, 'Pending', color: Colors.orange),
+          _buildStatusChip(context, 'Approved', color: Colors.green),
+          _buildStatusChip(context, 'Rejected', color: Colors.red),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusChip(BuildContext context, String label, {Color? color}) {
+    final vm = context.watch<VisitsViewModel>();
+    final isSelected = vm.statusFilter == label;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: isSelected,
+        selectedColor: (color ?? Theme.of(context).colorScheme.primary).withOpacity(0.15),
+        labelStyle: TextStyle(
+          color: isSelected ? (color ?? Theme.of(context).colorScheme.primary) : Colors.grey.shade700,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+        ),
+        side: BorderSide(color: isSelected ? (color ?? Theme.of(context).colorScheme.primary) : Colors.grey.shade300),
+        onSelected: (_) => vm.setStatusFilter(label),
+      ),
     );
   }
 }
@@ -393,7 +391,6 @@ class _CompactVisitCard extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            // Avatar
             CircleAvatar(
               radius: 16,
               backgroundColor: statusColor.withOpacity(0.12),
@@ -403,7 +400,6 @@ class _CompactVisitCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            // Content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -466,7 +462,6 @@ class _CompactVisitCard extends StatelessWidget {
                       ],
                     ],
                   ),
-                  // Warning indicators row
                   const SizedBox(height: 4),
                   Row(
                     children: [
@@ -487,7 +482,6 @@ class _CompactVisitCard extends StatelessWidget {
                 ],
               ),
             ),
-            // Arrow
             Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 20),
           ],
         ),
@@ -541,7 +535,6 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
   }
 
   void _listenToVisitUpdates() {
-    // Listen to Firestore document changes
     FirebaseFirestore.instance
         .collection('visits')
         .doc(widget.visitId)
@@ -600,13 +593,12 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
           ),
           child: Column(
             children: [
-              // Handle and close button
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const SizedBox(width: 40), // Spacer for alignment
+                    const SizedBox(width: 40),
                     Container(
                       margin: const EdgeInsets.only(top: 8),
                       width: 40,
@@ -629,7 +621,6 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
                   ],
                 ),
               ),
-              // Content
               Expanded(
                 child: SingleChildScrollView(
                   controller: scrollController,
@@ -637,7 +628,6 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Header
                       Row(
                         children: [
                           CircleAvatar(
@@ -679,8 +669,6 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
                         ],
                       ),
                       const SizedBox(height: 24),
-                      
-                      // Details
                       _detailRow(Icons.person_outline, 'Associate Name', associate),
                       _detailRow(Icons.person_outline, 'Customer Name', currentVisit['customerName'] ?? 'N/A'),
                       _detailRow(Icons.person_outline, 'Upperline Name', currentVisit['upperlineName'] ?? 'N/A'),
@@ -688,27 +676,19 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
                       _detailRow(Icons.numbers_outlined, 'RERA Number', currentVisit['reraNumber'] ?? 'N/A'),
                       _detailRow(Icons.lightbulb_outline, 'Scheme Name', currentVisit['schemeName'] ?? 'N/A'),
                       _detailRow(Icons.place_outlined, 'Location', location),
-                      if (formattedDate.isNotEmpty) 
+                      if (formattedDate.isNotEmpty)
                         _detailRow(Icons.access_time, 'Date & Time', formattedDate),
-                      
-                      // Scheme assignment details
                       if (currentVisit['plotNumber'] != null && currentVisit['plotNumber'].toString().isNotEmpty)
                         _detailRow(Icons.home_outlined, 'Plot Number', currentVisit['plotNumber'].toString()),
                       if (currentVisit['clientName'] != null && currentVisit['clientName'].toString().isNotEmpty)
                         _detailRow(Icons.person_outline, 'Client Name', currentVisit['clientName'].toString()),
                       if (gajSold != null && gajSold.toString().isNotEmpty)
                         _detailRow(Icons.landscape_outlined, 'Gaj Sold', '${gajSold} Gaj'),
-                      
                       if (scheme != null && scheme.toString().isNotEmpty)
                         _detailRow(Icons.lightbulb_outline, 'Old Scheme', scheme.toString()),
-
-                      // Photo section
                       if (photoUrl != null && photoUrl.isNotEmpty) ...[
                         const SizedBox(height: 24),
-                        const Text(
-                          'Visit Photo',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                        ),
+                        const Text('Visit Photo', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                         const SizedBox(height: 12),
                         GestureDetector(
                           onTap: () => _showFullScreenImage(context, photoUrl),
@@ -728,9 +708,7 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
                                     color: Colors.grey.shade100,
                                     borderRadius: BorderRadius.circular(12),
                                   ),
-                                  child: const Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
+                                  child: const Center(child: CircularProgressIndicator()),
                                 );
                               },
                               errorBuilder: (context, error, stackTrace) {
@@ -745,17 +723,9 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(Icons.broken_image, 
-                                           color: Colors.red.shade400, 
-                                           size: 48),
+                                      Icon(Icons.broken_image, color: Colors.red.shade400, size: 48),
                                       const SizedBox(height: 12),
-                                      Text(
-                                        'Failed to load image',
-                                        style: TextStyle(
-                                          color: Colors.red.shade600,
-                                          fontSize: 14,
-                                        ),
-                                      ),
+                                      Text('Failed to load image', style: TextStyle(color: Colors.red.shade600, fontSize: 14)),
                                     ],
                                   ),
                                 );
@@ -764,10 +734,7 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
                           ),
                         ),
                       ],
-
                       const SizedBox(height: 32),
-
-                      // Action buttons
                       if (status == 'Pending') ...[
                         Row(
                           children: [
@@ -775,10 +742,7 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
                               child: ElevatedButton.icon(
                                 onPressed: () async {
                                   await widget.onUpdateStatus(widget.visitId, 'Approved');
-                                  // Update local state and refresh UI
-                                  setState(() {
-                                    currentVisit['status'] = 'Approved';
-                                  });
+                                  // Firestore listener will refresh UI
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.green,
@@ -794,7 +758,7 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
                               child: ElevatedButton.icon(
                                 onPressed: () async {
                                   await widget.onUpdateStatus(widget.visitId, 'Rejected');
-                                  Navigator.pop(context); // Close after rejection
+                                  Navigator.pop(context);
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.red,
@@ -813,7 +777,6 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
                           child: OutlinedButton.icon(
                             onPressed: () {
                               widget.onAssignScheme(widget.visitId, scheme?.toString());
-                              // Don't close the modal - let user see the updated data
                             },
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 14),
@@ -910,17 +873,9 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.broken_image, 
-                             color: Colors.white, 
-                             size: 60),
+                        Icon(Icons.broken_image, color: Colors.white, size: 60),
                         SizedBox(height: 16),
-                        Text(
-                          'Failed to load image',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                          ),
-                        ),
+                        Text('Failed to load image', style: TextStyle(color: Colors.white, fontSize: 16)),
                       ],
                     ),
                   );
