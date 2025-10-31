@@ -95,68 +95,85 @@ class CommunityNotificationService extends ChangeNotifier {
         .collection('channels')
         .where('members', arrayContains: userId)
         .snapshots()
-        .listen((channelsSnapshot) {
+        .listen((channelsSnapshot) async {
       
+      if (channelsSnapshot.docs.isEmpty) {
+        // No channels, no unread messages
+        _updateNotificationState(0, null, null);
+        return;
+      }
+
       int totalUnread = 0;
       String? latestMessage;
       String? latestChannel;
       DateTime? latestTime;
 
+      // Process each channel
       for (final channelDoc in channelsSnapshot.docs) {
         final channelData = channelDoc.data();
         final channelName = channelData['name'] ?? 'Unknown Channel';
         
-        // Listen for messages in this channel from admin
-        final messagesSubscription = FirebaseFirestore.instance
-            .collection('channels')
-            .doc(channelDoc.id)
-            .collection('messages')
-            .where('createdAt', isGreaterThan: Timestamp.fromDate(_lastChecked!))
-            .orderBy('createdAt', descending: true)
-            .snapshots()
-            .listen((messagesSnapshot) {
-          
-          int channelUnread = 0;
-          
+        try {
+          // Get messages newer than last checked time
+          final messagesSnapshot = await FirebaseFirestore.instance
+              .collection('channels')
+              .doc(channelDoc.id)
+              .collection('messages')
+              .where('createdAt', isGreaterThan: Timestamp.fromDate(_lastChecked!))
+              .orderBy('createdAt', descending: true)
+              .get();
+
+          if (messagesSnapshot.docs.isEmpty) continue;
+
+          // Get all unique sender IDs
+          final senderIds = messagesSnapshot.docs
+              .map((doc) => doc.data()['userId'] as String?)
+              .where((id) => id != null && id != userId)
+              .toSet();
+
+          if (senderIds.isEmpty) continue;
+
+          // Batch get all user documents to check roles
+          final usersSnapshot = await FirebaseFirestore.instance
+              .collection('users')
+              .where(FieldPath.documentId, whereIn: senderIds.toList())
+              .get();
+
+          // Create a map of userId -> isAdmin
+          final adminMap = <String, bool>{};
+          for (final userDoc in usersSnapshot.docs) {
+            if (userDoc.exists) {
+              final role = (userDoc.data()['role'] ?? 'user').toString().toLowerCase();
+              adminMap[userDoc.id] = (role == 'admin');
+            }
+          }
+
+          // Count messages from admin users
           for (final messageDoc in messagesSnapshot.docs) {
             final messageData = messageDoc.data();
-            final senderId = messageData['userId'];
+            final senderId = messageData['userId'] as String?;
             
-            // Check if sender is admin
-            FirebaseFirestore.instance
-                .collection('users')
-                .doc(senderId)
-                .get()
-                .then((senderDoc) {
-              if (senderDoc.exists) {
-                final senderData = senderDoc.data()!;
-                final senderRole = (senderData['role'] ?? 'user').toString().toLowerCase();
-                
-                if (senderRole == 'admin' && senderId != userId) {
-                  channelUnread++;
-                  
-                  // Track latest admin message
-                  final messageTime = (messageData['createdAt'] as Timestamp).toDate();
-                  if (latestTime == null || messageTime.isAfter(latestTime!)) {
-                    latestTime = messageTime;
-                    latestMessage = messageData['text'] ?? 'New message';
-                    latestChannel = channelName;
-                  }
-                }
+            if (senderId != null && 
+                senderId != userId && 
+                adminMap[senderId] == true) {
+              totalUnread++;
+              
+              // Track latest admin message
+              final messageTime = (messageData['createdAt'] as Timestamp).toDate();
+              if (latestTime == null || messageTime.isAfter(latestTime)) {
+                latestTime = messageTime;
+                latestMessage = messageData['text'] ?? 'New message';
+                latestChannel = channelName;
               }
-            });
+            }
           }
-          
-          // Update total count (simplified for demo)
-          if (channelUnread > 0) {
-            totalUnread += channelUnread;
-            _updateNotificationState(totalUnread, latestMessage, latestChannel);
-          }
-        });
-        
-        // Add message subscription to cleanup list
-        _subscriptions.add(messagesSubscription);
+        } catch (e) {
+          print('Error processing channel ${channelDoc.id}: $e');
+        }
       }
+
+      // Update state with final count
+      _updateNotificationState(totalUnread, latestMessage, latestChannel);
     });
     
     // Add channels subscription to cleanup list

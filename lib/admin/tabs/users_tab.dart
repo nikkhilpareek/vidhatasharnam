@@ -1,10 +1,82 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../services/password_reset_cleanup.dart';
 
 class UsersTab extends StatelessWidget {
   final VoidCallback onCreateUser;
   const UsersTab({super.key, required this.onCreateUser});
+
+  Future<void> _runPasswordResetCleanup(BuildContext context) async {
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clean Up Password Reset Flags'),
+        content: const Text(
+          'This will remove the "adminRequestedPasswordChange" flag from all users, '
+          'allowing them to login after password reset.\n\n'
+          'This is a one-time fix for users who are currently locked out.\n\n'
+          'Continue?'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Run Cleanup'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    if (!context.mounted) return;
+
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Text('Cleaning up...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      await cleanupPasswordResetFlags();
+      
+      if (!context.mounted) return;
+      Navigator.pop(context); // Close loading dialog
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Password reset flags cleaned up successfully!'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      Navigator.pop(context); // Close loading dialog
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Error: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -15,18 +87,36 @@ class UsersTab extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(20),
             color: Colors.white,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
               children: [
-                const Text('Users', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                ElevatedButton.icon(
-                  onPressed: onCreateUser,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add User'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Colors.white,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Users', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    Row(
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () => _runPasswordResetCleanup(context),
+                          icon: const Icon(Icons.cleaning_services, size: 18),
+                          label: const Text('Fix Locked Users'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.orange,
+                            side: const BorderSide(color: Colors.orange),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          onPressed: onCreateUser,
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add User'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Theme.of(context).colorScheme.primary,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -137,11 +227,12 @@ class _UserCard extends StatelessWidget {
                         // Send password reset email to the user
                         await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
                         
-                        // Store admin action in Firestore for audit trail
+                        // Store admin action in Firestore for audit trail (but don't set blocking flag)
                         await FirebaseFirestore.instance.collection('users').doc(userId).update({
                           'passwordResetSentBy': FirebaseAuth.instance.currentUser?.uid,
                           'passwordResetSentAt': FieldValue.serverTimestamp(),
-                          'adminRequestedPasswordChange': true,
+                          'lastPasswordResetRequestedByAdmin': FieldValue.serverTimestamp(),
+                          // Don't set adminRequestedPasswordChange as it might block login
                         });
 
                         if (context.mounted) {

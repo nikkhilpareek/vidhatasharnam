@@ -11,6 +11,7 @@ import 'app_theme.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'services/auth_service.dart';
+import 'services/community_notification_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 
@@ -43,9 +44,6 @@ Future<void> _loadUserData() async {
     }
   }
 }
-
-  // Simple notification state
-  int _notificationCount = 12; // Hardcoded for testing - matches your image
 
   Widget _buildCardButton({
     required String title,
@@ -576,50 +574,52 @@ Future<void> _loadUserData() async {
             Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Stack(
-                  children: [
-                    IconButton(
-                      onPressed: () {
-                        // Clear notifications when visiting community
-                        setState(() {
-                          _notificationCount = 0;
-                        });
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => CommunityScreen(),
-                          ),
-                        );
-                      },
-                      icon: Icon(Icons.group, size: 26, color: Colors.grey.shade600),
-                    ),
-                    // Simple notification badge - like in your image
-                    if (_notificationCount > 0)
-                      Positioned(
-                        right: 8,
-                        top: 8,
-                        child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          constraints: BoxConstraints(
-                            minWidth: 20,
-                            minHeight: 20,
-                          ),
-                          child: Text(
-                            _notificationCount > 99 ? '99+' : _notificationCount.toString(),
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
+                Consumer<CommunityNotificationService>(
+                  builder: (context, communityService, child) {
+                    final unreadCount = communityService.unreadCount;
+                    
+                    return Stack(
+                      children: [
+                        IconButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => CommunityScreen(),
+                              ),
+                            );
+                          },
+                          icon: Icon(Icons.group, size: 26, color: Colors.grey.shade600),
                         ),
-                      ),
-                  ],
+                        // Dynamic notification badge based on actual unread messages
+                        if (unreadCount > 0)
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            child: Container(
+                              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              constraints: BoxConstraints(
+                                minWidth: 20,
+                                minHeight: 20,
+                              ),
+                              child: Text(
+                                unreadCount > 99 ? '99+' : unreadCount.toString(),
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
                 ),
                 Text(
                   "Community",
