@@ -20,3 +20,5 @@ class VisitsViewModel extends ChangeNotifier {
     notifyListeners();
   }
 }
+
+

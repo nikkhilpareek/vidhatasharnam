@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -24,10 +26,36 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>UILaunchStoryboardName</key>
-	<string>LaunchScreen</string>
-	<key>UIMainStoryboardFile</key>
-	<string>Main</string>
+
+	<!-- Permissions -->
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs access to your camera to capture photos for visit documentation.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>This app requires access to your location even in the background for accurate visit tracking.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>This app needs your location to automatically detect and record visit locations accurately.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app needs your location to automatically detect and record visit locations accurately.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>This app needs access to save photos to your photo library.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to your photo library to select photos for visit documentation.</string>
+
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+
+	<!-- ✅ FIX 1: Use UILaunchScreen instead of UILaunchStoryboardName -->
+	<key>UILaunchScreen</key>
+	<dict/>
+
+	<!-- ✅ FIX 2: Remove UIMainStoryboardFile (Flutter doesn’t use Main.storyboard) -->
+	<!-- (Removed: <key>UIMainStoryboardFile</key> <string>Main</string>) -->
+
+	<!-- ✅ FIX 3: Declare minimum iOS version -->
+	<key>MinimumOSVersion</key>
+	<string>14.0</string>
+
+	<!-- Supported orientations -->
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -41,21 +69,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>CADisableMinimumFrameDurationOnPhone</key>
-	<true/>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>This app requires access to your location even in the background for accurate visit tracking.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app needs your location to automatically detect and record visit locations accurately.</string>
-	<key>NSLocationAlwaysUsageDescription</key>
-	<string>This app needs your location to automatically detect and record visit locations accurately.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>This app needs access to your camera to capture photos for visit documentation.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>This app needs access to your photo library to select photos for visit documentation.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>This app needs access to save photos to your photo library.</string>
 </dict>
 </plist>
