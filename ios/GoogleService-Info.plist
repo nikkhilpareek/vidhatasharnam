@@ -9,7 +9,7 @@
     <key>PLIST_VERSION</key>
     <string>1</string>
     <key>BUNDLE_ID</key>
-    <string>com.vidhatasharanam.app</string>
+    <string>com.vidhatasharnam.app</string>
     <key>PROJECT_ID</key>
     <string>vidhata-811df</string>
     <key>STORAGE_BUCKET</key>
@@ -25,6 +25,6 @@
     <key>IS_SIGNIN_ENABLED</key>
     <true></true>
     <key>GOOGLE_APP_ID</key>
-    <string>1:708295037460:ios:d263b7d8b1c2d2cad1cd01</string>
+    <string>1:708295037460:ios:3ab8d92c880a30bbd1cd01</string>
 </dict>
 </plist>

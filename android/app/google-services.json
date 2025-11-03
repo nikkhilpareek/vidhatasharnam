@@ -7,47 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:708295037460:android:cec6700b74d3f9f4d1cd01",
-        "android_client_info": {
-          "package_name": "com.example.vidhatasharnam"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyA6HpmfXbmxLAoO3-blxT0MzqLWwQ0je2A"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
         "mobilesdk_app_id": "1:708295037460:android:19b96c1dee7d44e2d1cd01",
         "android_client_info": {
           "package_name": "com.vidhatasharanam.app"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyA6HpmfXbmxLAoO3-blxT0MzqLWwQ0je2A"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:708295037460:android:c269a95e308b28e7d1cd01",
-        "android_client_info": {
-          "package_name": "com.vidhatasharanam.v1"
         }
       },
       "oauth_client": [],
@@ -65,3 +27,4 @@
   ],
   "configuration_version": "1"
 }
+

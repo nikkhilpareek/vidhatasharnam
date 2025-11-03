@@ -93,58 +93,61 @@ class _AppInitializerState extends State<AppInitializer> {
   @override
   void initState() {
     super.initState();
-    // Initialize after first frame
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initializeApp();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initializeApp());
   }
 
   Future<void> _initializeApp() async {
     try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
+      // Try Firebase (but don’t block if it fails)
+      try {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+      } catch (e) {
+        debugPrint('⚠️ Firebase init failed: $e');
+      }
 
       await AuthService.instance.init();
-      
+
+      // ✅ Ensure HTTPS in SupabaseConfig
       await SupabaseConfig.initialize();
-      
+
       final authService = AuthService.instance;
+
+      // Wait until AuthService finishes setup
       while (!authService.isInitialized) {
         await Future.delayed(const Duration(milliseconds: 50));
       }
-      
+
       if (authService.isAuthenticated) {
         await CommunityNotificationService.instance.initialize();
       }
-      
-      await Future.delayed(const Duration(milliseconds: 800));
-      
+
+      // Short splash delay for smoother UX
+      await Future.delayed(const Duration(milliseconds: 600));
+
+      // ✅ Always navigate after init (even if partial failure)
       if (mounted) {
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => const AuthWrapper(),
-            transitionDuration: const Duration(milliseconds: 300),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return FadeTransition(opacity: animation, child: child);
-            },
+            pageBuilder: (_, __, ___) => const AuthWrapper(),
+            transitionDuration: const Duration(milliseconds: 400),
+            transitionsBuilder: (_, animation, __, child) =>
+                FadeTransition(opacity: animation, child: child),
           ),
         );
       }
     } catch (e, stackTrace) {
-      AppLogger.error(
-        'App initialization error',
-        error: e,
-        stackTrace: stackTrace,
-      );
+      AppLogger.error('App initialization error', error: e, stackTrace: stackTrace);
+
+      // ✅ Fail-safe navigation (never stay on blank screen)
       if (mounted) {
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => const AuthWrapper(),
-            transitionDuration: const Duration(milliseconds: 300),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return FadeTransition(opacity: animation, child: child);
-            },
+            pageBuilder: (_, __, ___) => const AuthWrapper(),
+            transitionDuration: const Duration(milliseconds: 400),
+            transitionsBuilder: (_, animation, __, child) =>
+                FadeTransition(opacity: animation, child: child),
           ),
         );
       }

@@ -26,8 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-
-	<!-- Permissions -->
+	<key>MinimumOSVersion</key>
+	<string>14.0</string>
+	<key>NSAllowsArbitraryLoads</key>
+	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs access to your camera to capture photos for visit documentation.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
@@ -40,22 +42,10 @@
 	<string>This app needs access to save photos to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>This app needs access to your photo library to select photos for visit documentation.</string>
-
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-
-	<!-- ✅ FIX 1: Use UILaunchScreen instead of UILaunchStoryboardName -->
 	<key>UILaunchScreen</key>
 	<dict/>
-
-	<!-- ✅ FIX 2: Remove UIMainStoryboardFile (Flutter doesn’t use Main.storyboard) -->
-	<!-- (Removed: <key>UIMainStoryboardFile</key> <string>Main</string>) -->
-
-	<!-- ✅ FIX 3: Declare minimum iOS version -->
-	<key>MinimumOSVersion</key>
-	<string>14.0</string>
-
-	<!-- Supported orientations -->
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
