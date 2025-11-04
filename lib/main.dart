@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
@@ -29,7 +28,6 @@ Future<void> main() async {
           error: details.exception,
           stackTrace: details.stack,
         );
-        FirebaseCrashlytics.instance.recordFlutterFatalError(details);
       };
 
       // Initialize Firebase
@@ -45,7 +43,6 @@ Future<void> main() async {
         error: error,
         stackTrace: stackTrace,
       );
-      FirebaseCrashlytics.instance.recordError(error, stackTrace, fatal: true);
     },
   );
 }
