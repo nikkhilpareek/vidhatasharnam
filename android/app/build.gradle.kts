@@ -19,7 +19,7 @@ plugins {
 }
 
 android {
-    namespace = "com.vidhatasharanam.app"
+    namespace = "com.vidhata.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -33,7 +33,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.vidhatasharanam.app"
+        applicationId = "com.vidhata.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

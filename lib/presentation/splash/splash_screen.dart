@@ -14,10 +14,17 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  late final DateTime _splashStartTime;
+  
   @override
   void initState() {
     super.initState();
+    _splashStartTime = DateTime.now();
+    debugPrint('⏱️ [TIMING] SplashScreen.initState() called: ${DateTime.now()}');
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final firstFrameTime = DateTime.now();
+      final timeToFirstFrame = firstFrameTime.difference(_splashStartTime);
+      debugPrint('⏱️ [TIMING] SplashScreen first frame rendered: ${timeToFirstFrame.inMilliseconds}ms from widget init');
       _checkLoginStatus();
     });
   }

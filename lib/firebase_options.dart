@@ -66,10 +66,10 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyAVSAaXxDkEXTHVryETTP48US7QW5seW9E',
-    appId: '1:708295037460:ios:220854788aaf7b7dd1cd01',
+    appId: '1:708295037460:ios:fea3e8026d17b980d1cd01',
     messagingSenderId: '708295037460',
     projectId: 'vidhata-811df',
     storageBucket: 'vidhata-811df.firebasestorage.app',
-    iosBundleId: 'com.vidhatasharanam.app',
+    iosBundleId: 'com.vidhata.app',
   );
 }
