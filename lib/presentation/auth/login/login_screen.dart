@@ -1,10 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:vidhatasharnam/core/theme/app_theme.dart';
 import 'package:vidhatasharnam/core/config/app_constants.dart';
 import 'package:vidhatasharnam/data/datasources/auth/auth_service.dart';
-import 'package:vidhatasharnam/data/datasources/community/community_notification_service.dart';
+import 'package:vidhatasharnam/domain/repositories/local_storage.dart';
 import 'package:vidhatasharnam/presentation/auth/login/login_view_model.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -40,16 +41,52 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (success) {
-      // Wait for AuthService to update
+      // Wait for AuthService to update and save login state
       final authService = AuthService.instance;
-      while (!authService.isInitialized || !authService.isAuthenticated) {
+      debugPrint('[LoginScreen] Waiting for AuthService to be authenticated...');
+      
+      // Wait for authentication with timeout
+      int attempts = 0;
+      const maxAttempts = 100; // 5 seconds max wait
+      while ((!authService.isInitialized || !authService.isAuthenticated) && attempts < maxAttempts) {
         await Future.delayed(const Duration(milliseconds: 50));
+        attempts++;
       }
 
-      // Initialize Community Notification Service
-      await CommunityNotificationService.instance.initialize();
+      if (!authService.isAuthenticated) {
+        debugPrint('[LoginScreen] WARNING: AuthService not authenticated after wait');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Login successful but authentication state not ready. Please try again.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
 
+      // Verify session was saved to LocalStorage
+      final localStorage = LocalStorageService();
+      final isLoggedInSaved = localStorage.getBool(AppConstants.prefIsLoggedIn) ?? false;
+      debugPrint('[LoginScreen] Login flag saved to LocalStorage: $isLoggedInSaved');
+      
+      if (!isLoggedInSaved) {
+        debugPrint('[LoginScreen] ERROR: Login flag not saved! Waiting a bit more...');
+        await Future.delayed(const Duration(milliseconds: 200));
+        final retryCheck = localStorage.getBool(AppConstants.prefIsLoggedIn) ?? false;
+        debugPrint('[LoginScreen] Retry check result: $retryCheck');
+        
+        if (!retryCheck) {
+          debugPrint('[LoginScreen] CRITICAL: Login flag still not saved after retry!');
+        }
+      }
+
+      // AuthService has already saved login state via LocalStorageService
+      // Now navigate based on user role
       final userData = authService.userData!;
+      debugPrint('[LoginScreen] Navigating to dashboard for role: ${userData.role}');
+      
       if (userData.role == "admin") {
         Navigator.of(context).pushReplacementNamed(
           AppConstants.navigateToAdminPanel,
@@ -63,12 +100,14 @@ class _LoginScreenState extends State<LoginScreen> {
     } else {
       final errorMessage =
           loginViewModel.errorMessage ?? 'Unable to sign in. Please try again.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMessage),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -76,7 +115,9 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final isLoading = context.select<LoginViewModel, bool>((vm) => vm.isLoading);
 
-    return Scaffold(
+    return PopScope(
+      canPop: false, // Prevent back button navigation
+      child: Scaffold(
       backgroundColor: Colors.grey.shade50,
       body: SafeArea(
         child: SingleChildScrollView(
@@ -269,6 +310,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

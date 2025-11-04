@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LocalStorageService {
@@ -18,27 +19,42 @@ class LocalStorageService {
 
   // Save Data
   Future<void> saveString(String key, String value) async {
+    debugPrint('[LocalStorage] Saving string - Key: $key, Value: ${value.length > 50 ? value.substring(0, 50) + "..." : value}');
     await _preferences?.setString(key, value);
+    final saved = _preferences?.getString(key);
+    debugPrint('[LocalStorage] Verified save - Key: $key, Saved: ${saved != null ? "SUCCESS" : "FAILED"}');
   }
+  
   // Save Data
   Future<void> saveInt(String key, int value) async {
+    debugPrint('[LocalStorage] Saving int - Key: $key, Value: $value');
     await _preferences?.setInt(key, value);
   }
 
   Future<void> saveBool(String key, bool value) async {
+    debugPrint('[LocalStorage] Saving bool - Key: $key, Value: $value');
     await _preferences?.setBool(key, value);
+    final saved = _preferences?.getBool(key);
+    debugPrint('[LocalStorage] Verified save - Key: $key, Saved: $saved');
   }
 
   // Retrieve Data
   String? getString(String key) {
-    return _preferences?.getString(key);
+    final value = _preferences?.getString(key);
+    debugPrint('[LocalStorage] Getting string - Key: $key, Value: ${value != null ? (value.length > 50 ? value.substring(0, 50) + "..." : value) : "NULL"}');
+    return value;
   }
+  
   int? getInt(String key) {
-    return _preferences?.getInt(key);
+    final value = _preferences?.getInt(key);
+    debugPrint('[LocalStorage] Getting int - Key: $key, Value: $value');
+    return value;
   }
 
   bool? getBool(String key) {
-    return _preferences?.getBool(key);
+    final value = _preferences?.getBool(key);
+    debugPrint('[LocalStorage] Getting bool - Key: $key, Value: $value');
+    return value;
   }
 
   // Remove Data

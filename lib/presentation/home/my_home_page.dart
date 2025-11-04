@@ -5,7 +5,10 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:vidhatasharnam/core/logger/app_logger.dart';
 import 'package:vidhatasharnam/core/theme/app_theme.dart';
+import 'package:vidhatasharnam/core/config/app_constants.dart';
+import 'package:vidhatasharnam/domain/repositories/local_storage.dart';
 import 'package:vidhatasharnam/data/datasources/auth/auth_service.dart';
+import 'package:vidhatasharnam/data/datasources/community/community_notification_service.dart';
 import 'package:vidhatasharnam/presentation/community/community_screen.dart';
 import 'package:vidhatasharnam/presentation/profile/profile_page.dart';
 import 'package:vidhatasharnam/presentation/visits/new_visit.dart';
@@ -26,23 +29,92 @@ class _MyHomePageState extends State<MyHomePage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   String? userName;
-  @override
-void initState() {
-  super.initState();
-  _loadUserData();
-}
+  final LocalStorageService _localStorage = LocalStorageService();
 
-Future<void> _loadUserData() async {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user != null) {
-    final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-    if (doc.exists) {
-      setState(() {
-        userName = doc['username']; // 👈 make sure your Firestore has a "name" field
-      });
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+    
+    // Initialize background processes after the screen is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeBackgroundProcesses();
+    });
+  }
+
+  Future<void> _loadUserData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (doc.exists) {
+        setState(() {
+          userName = doc['username']; // 👈 make sure your Firestore has a "name" field
+        });
+      }
     }
   }
-}
+
+  /// Initialize background processes like device registration and notification service
+  Future<void> _initializeBackgroundProcesses() async {
+    try {
+      // Initialize Community Notification Service
+      await CommunityNotificationService.instance.initialize();
+      
+      // Register device token if not already registered
+      await _registerDeviceIfNeeded();
+    } catch (e, stackTrace) {
+      AppLogger.error(
+        'Error initializing background processes',
+        error: e,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  /// Register device token if not already registered
+  Future<void> _registerDeviceIfNeeded() async {
+    try {
+      final isDeviceRegistered = _localStorage.getBool(AppConstants.prefDeviceRegistered) ?? false;
+      final storedToken = _localStorage.getString(AppConstants.prefRegisteredDeviceToken);
+      
+      // Check if device is already registered
+      if (isDeviceRegistered && storedToken != null) {
+        AppLogger.info('Device already registered with token: $storedToken');
+        return;
+      }
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        AppLogger.warning('Cannot register device: User not logged in');
+        return;
+      }
+
+      // TODO: Replace with actual FCM token retrieval
+      // For now, this is a placeholder that you can integrate with firebase_messaging
+      // Example:
+      // final fcmToken = await FirebaseMessaging.instance.getToken();
+      
+      // Placeholder: Generate a mock token for demonstration
+      // In production, replace this with actual FCM token from FirebaseMessaging
+      final deviceToken = 'mock_device_token_${DateTime.now().millisecondsSinceEpoch}';
+      
+      // Save registration status
+      await _localStorage.saveBool(AppConstants.prefDeviceRegistered, true);
+      await _localStorage.saveString(AppConstants.prefRegisteredDeviceToken, deviceToken);
+      
+      // TODO: Send token to your backend/API
+      // Example API call:
+      // await HomeRepository.registerDevice(userId: user.uid, token: deviceToken);
+      
+      AppLogger.info('Device registered successfully with token: $deviceToken');
+    } catch (e, stackTrace) {
+      AppLogger.error(
+        'Error registering device',
+        error: e,
+        stackTrace: stackTrace,
+      );
+    }
+  }
 
   // Simple notification state
   int _notificationCount = 12; // Hardcoded for testing - matches your image
@@ -358,6 +430,8 @@ Future<void> _loadUserData() async {
 
   void _performLogout() async {
     // Show loading indicator briefly
+    if (!mounted) return;
+    
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -391,24 +465,28 @@ Future<void> _loadUserData() async {
     );
 
     try {
-      // Use AuthService to sign out
+      // Use AuthService to sign out (this will clear LocalStorageService)
       await AuthService.instance.signOut();
       
       // Close loading dialog
-      if (Navigator.canPop(context)) {
+      if (mounted && Navigator.canPop(context)) {
         Navigator.of(context).pop();
       }
       
-      // AuthService will handle navigation through AuthWrapper
-      // No manual navigation needed
+      // Navigate to login screen and prevent back navigation
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed(
+          AppConstants.navigateToLoginScreen,
+        );
+      }
     } catch (e) {
       // Close loading dialog
-      if (Navigator.canPop(context)) {
+      if (mounted && Navigator.canPop(context)) {
         Navigator.of(context).pop();
       }
       
       // Show error message
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error logging out: $e'),

@@ -1,9 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 
 import 'package:vidhatasharnam/core/logger/app_logger.dart';
+import 'package:vidhatasharnam/core/config/app_constants.dart';
+import 'package:vidhatasharnam/domain/repositories/local_storage.dart';
 
 enum AuthStatus {
   unknown,
@@ -55,8 +56,7 @@ class AuthService extends ChangeNotifier {
   bool get isAuthenticated => _status == AuthStatus.authenticated;
   bool get isInitialized => _isInitialized;
 
-  static const String _lastLoginKey = 'last_successful_login';
-  static const String _userDataKey = 'cached_user_data';
+  final LocalStorageService _localStorage = LocalStorageService();
 
   Future<void> init() async {
     _status = AuthStatus.loading;
@@ -68,18 +68,15 @@ class AuthService extends ChangeNotifier {
 
   Future<void> _checkExistingSession() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final lastLogin = prefs.getString(_lastLoginKey);
-      final cachedUserData = prefs.getString(_userDataKey);
+      // Check login status via LocalStorageService
+      final isLoggedIn = _localStorage.getBool(AppConstants.prefIsLoggedIn) ?? false;
+      final userId = _localStorage.getString(AppConstants.prefUserId);
 
       // Get current Firebase user
       final currentUser = FirebaseAuth.instance.currentUser;
 
-      if (currentUser != null && lastLogin != null) {
-        // User exists in Firebase Auth, verify with Firestore
-        await _verifyAndSetUserData(currentUser);
-      } else if (cachedUserData != null && currentUser != null) {
-        // Fallback to cached data while verifying
+      if (currentUser != null && isLoggedIn && userId != null && userId == currentUser.uid) {
+        // User exists in Firebase Auth and is logged in, verify with Firestore
         await _verifyAndSetUserData(currentUser);
       } else {
         // No valid session found
@@ -100,12 +97,18 @@ class AuthService extends ChangeNotifier {
 
   void _onAuthStateChanged(User? user) async {
     _firebaseUser = user;
+    debugPrint('[AuthService] _onAuthStateChanged called, user: ${user?.uid ?? "null"}, current status: $_status');
     
     if (user == null) {
       await _clearSession();
     } else if (_status != AuthStatus.authenticated) {
       // User signed in, verify their data
+      // Note: This might be called from Firebase listener, but signIn also calls _verifyAndSetUserData
+      // The method itself is idempotent, so it's safe to call multiple times
+      debugPrint('[AuthService] _onAuthStateChanged: Verifying user data...');
       await _verifyAndSetUserData(user);
+    } else {
+      debugPrint('[AuthService] _onAuthStateChanged: Already authenticated, skipping verification');
     }
   }
 
@@ -150,23 +153,55 @@ class AuthService extends ChangeNotifier {
 
   Future<void> _saveUserSession(UserData userData) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_lastLoginKey, DateTime.now().toIso8601String());
-      await prefs.setString(_userDataKey, userData.uid); // Just store reference
+      // Save user session data using LocalStorageService
+      AppLogger.info('Saving user session to LocalStorage: ${userData.uid}');
+      debugPrint('[AuthService] Saving login flag: true');
+      await _localStorage.saveBool(AppConstants.prefIsLoggedIn, true);
+      
+      debugPrint('[AuthService] Saving userId: ${userData.uid}');
+      await _localStorage.saveString(AppConstants.prefUserId, userData.uid);
+      
+      debugPrint('[AuthService] Saving userEmail: ${userData.email}');
+      await _localStorage.saveString(AppConstants.prefUserEmail, userData.email);
+      
+      debugPrint('[AuthService] Saving userRole: ${userData.role}');
+      await _localStorage.saveString(AppConstants.prefUserRole, userData.role);
+      
+      // Get Firebase auth token if available
+      if (_firebaseUser != null) {
+        final token = await _firebaseUser!.getIdToken();
+        if (token != null) {
+          debugPrint('[AuthService] Saving userToken: ${token.substring(0, 20)}...');
+          await _localStorage.saveString(AppConstants.prefUserToken, token);
+        }
+      }
+      
+      // Verify the save was successful
+      final savedLoginFlag = _localStorage.getBool(AppConstants.prefIsLoggedIn);
+      final savedUserId = _localStorage.getString(AppConstants.prefUserId);
+      debugPrint('[AuthService] Verification - Login flag saved: $savedLoginFlag');
+      debugPrint('[AuthService] Verification - UserId saved: $savedUserId');
+      
+      AppLogger.info('User session saved successfully');
     } catch (e, stackTrace) {
       AppLogger.warning(
         'Error saving user session for user ${userData.uid}',
         error: e,
         stackTrace: stackTrace,
       );
+      rethrow;
     }
   }
 
   Future<void> _clearSession() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_lastLoginKey);
-      await prefs.remove(_userDataKey);
+      // Clear all authentication-related data from LocalStorageService
+      await _localStorage.remove(AppConstants.prefIsLoggedIn);
+      await _localStorage.remove(AppConstants.prefUserToken);
+      await _localStorage.remove(AppConstants.prefUserId);
+      await _localStorage.remove(AppConstants.prefUserEmail);
+      await _localStorage.remove(AppConstants.prefUserRole);
+      // Note: Device registration data is kept intentionally
     } catch (e, stackTrace) {
       AppLogger.warning(
         'Error clearing session data',
@@ -183,6 +218,8 @@ class AuthService extends ChangeNotifier {
 
   Future<void> signIn(String email, String password) async {
     try {
+      AppLogger.info('AuthService.signIn called for: $email');
+      debugPrint('[AuthService] Starting signIn for: $email');
       _status = AuthStatus.loading;
       notifyListeners();
 
@@ -195,7 +232,14 @@ class AuthService extends ChangeNotifier {
         throw Exception('Login failed');
       }
 
-      // _onAuthStateChanged will handle the rest
+      debugPrint('[AuthService] Firebase signIn successful, user: ${credential.user!.uid}');
+      
+      // Ensure user data is verified and saved immediately
+      // Don't rely solely on _onAuthStateChanged callback timing
+      if (credential.user != null) {
+        await _verifyAndSetUserData(credential.user!);
+        debugPrint('[AuthService] User data verified and saved after signIn');
+      }
     } catch (e, stackTrace) {
       AppLogger.error(
         'Error during sign in for $email',

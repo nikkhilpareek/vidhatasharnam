@@ -1,11 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/config/app_constants.dart';
-import '../../data/datasources/auth/auth_service.dart';
-import '../../data/datasources/community/community_notification_service.dart';
-import '../../config/supabase_config.dart';
+import '../../domain/repositories/local_storage.dart';
 import '../../core/logger/app_logger.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -20,56 +18,54 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initializeApp();
+      _checkLoginStatus();
     });
   }
 
-  Future<void> _initializeApp() async {
+  Future<void> _checkLoginStatus() async {
     try {
-      // Initialize Supabase
-      await SupabaseConfig.initialize();
-
-      // Initialize AuthService
-      await AuthService.instance.init();
-
-      // Wait for AuthService to complete initialization
-      final authService = AuthService.instance;
-      while (!authService.isInitialized) {
-        await Future.delayed(const Duration(milliseconds: 50));
-      }
-
       // Add minimum splash duration for better UX
       await Future.delayed(const Duration(milliseconds: 800));
 
       if (!mounted) return;
 
-      // Navigate based on auth status
-      if (authService.isAuthenticated) {
-        // Initialize Community Notification Service
-        await CommunityNotificationService.instance.initialize();
+      // Lightweight check: Only check if user is logged in via LocalStorageService
+      final localStorage = LocalStorageService();
+      debugPrint('[SplashScreen] Checking login status...');
+      final isLoggedIn = localStorage.getBool(AppConstants.prefIsLoggedIn) ?? false;
+      debugPrint('[SplashScreen] Login status: $isLoggedIn');
 
-        final userData = authService.userData!;
-        if (userData.role == "admin") {
+      if (isLoggedIn) {
+        // Get user role to determine navigation
+        final userRole = localStorage.getString(AppConstants.prefUserRole) ?? '';
+        debugPrint('[SplashScreen] User role: $userRole');
+        
+        if (userRole.toLowerCase() == 'admin') {
+          final userName = localStorage.getString(AppConstants.prefUserEmail)?.split('@')[0] ?? 'Admin';
+          debugPrint('[SplashScreen] Navigating to AdminPanel as: $userName');
           Navigator.of(context).pushReplacementNamed(
             AppConstants.navigateToAdminPanel,
-            arguments: userData.displayName,
+            arguments: userName,
           );
         } else {
+          debugPrint('[SplashScreen] Navigating to HomeScreen');
           Navigator.of(context).pushReplacementNamed(
             AppConstants.navigateToHomeScreen,
           );
         }
       } else {
+        debugPrint('[SplashScreen] Not logged in, navigating to LoginScreen');
         Navigator.of(context).pushReplacementNamed(
           AppConstants.navigateToLoginScreen,
         );
       }
     } catch (e, stackTrace) {
       AppLogger.error(
-        'App initialization error',
+        'Error checking login status in splash screen',
         error: e,
         stackTrace: stackTrace,
       );
+      debugPrint('[SplashScreen] Error: $e');
       if (mounted) {
         Navigator.of(context).pushReplacementNamed(
           AppConstants.navigateToLoginScreen,

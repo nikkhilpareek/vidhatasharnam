@@ -14,5 +14,14 @@ class AppConstants {
   
   // Community routes
   static const String navigateToCommunity = '/community';
+
+  // LocalStorage keys
+  static const String prefIsLoggedIn = 'pref_is_logged_in';
+  static const String prefUserToken = 'pref_user_token';
+  static const String prefUserId = 'pref_user_id';
+  static const String prefUserEmail = 'pref_user_email';
+  static const String prefUserRole = 'pref_user_role';
+  static const String prefDeviceRegistered = 'pref_device_registered';
+  static const String prefRegisteredDeviceToken = 'pref_registered_device_token';
 }
 
