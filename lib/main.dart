@@ -1,16 +1,16 @@
 import 'dart:async';
 
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:vidhatasharnam/domain/repositories/local_storage.dart';
 
 import 'firebase_options.dart';
-import 'package:vidhatasharnam/presentation/auth/auth_wrapper.dart';
-import 'package:vidhatasharnam/presentation/splash/splash_screen.dart';
-import 'config/supabase_config.dart';
+import 'package:vidhatasharnam/core/config/app_constants.dart';
+import 'package:vidhatasharnam/core/routes/app_routes.dart';
+import 'package:vidhatasharnam/admin/admin_panel.dart';
 import 'package:vidhatasharnam/data/datasources/auth/auth_service.dart';
-import 'package:vidhatasharnam/data/datasources/community/community_notification_service.dart';
 import 'package:vidhatasharnam/core/theme/app_theme.dart';
 import 'package:vidhatasharnam/core/logger/app_logger.dart';
 import 'package:vidhatasharnam/core/exceptions/exception_handler.dart';
@@ -19,43 +19,40 @@ import 'package:vidhatasharnam/domain/repositories/auth_repository.dart';
 import 'package:vidhatasharnam/presentation/auth/login/login_view_model.dart';
 
 Future<void> main() async {
-  await runZonedGuarded<Future<void>>(() async {
-    WidgetsFlutterBinding.ensureInitialized();
+  await runZonedGuarded<Future<void>>(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+      await LocalStorageService.init();
+      FlutterError.onError = (FlutterErrorDetails details) {
+        AppLogger.critical(
+          'Uncaught Flutter framework error',
+          error: details.exception,
+          stackTrace: details.stack,
+        );
+        FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+      };
 
-    // Configure global error handlers inside the same zone
-    FlutterError.onError = (FlutterErrorDetails details) {
-      AppLogger.critical(
-        'Uncaught Flutter framework error',
-        error: details.exception,
-        stackTrace: details.stack,
+      // Initialize Firebase
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
       );
-    };
 
-    WidgetsBinding.instance.platformDispatcher.onError = (error, stackTrace) {
+      runApp(const MyApp());
+    },
+    (error, stackTrace) {
       AppLogger.critical(
-        'Uncaught platform error',
+        'Uncaught zone error',
         error: error,
         stackTrace: stackTrace,
       );
-      return true;
-    };
-
-    // Avoid runtime font fetches (works offline; falls back if not bundled)
-    GoogleFonts.config.allowRuntimeFetching = false;
-
-    runApp(const MyApp());
-  }, (error, stackTrace) {
-    AppLogger.critical(
-      'Uncaught zone error',
-      error: error,
-      stackTrace: stackTrace,
-    );
-  });
+      FirebaseCrashlytics.instance.recordError(error, stackTrace, fatal: true);
+    },
+  );
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
-  
+
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
@@ -63,7 +60,8 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider<AuthService>.value(value: AuthService.instance),
         Provider<ExceptionHandler>(create: (_) => const ExceptionHandler()),
         ProxyProvider<AuthService, AuthRepository>(
-          update: (_, authService, __) => AuthRepositoryImpl(authService: authService),
+          update: (_, authService, __) =>
+              AuthRepositoryImpl(authService: authService),
         ),
         ChangeNotifierProvider<LoginViewModel>(
           create: (context) => LoginViewModel(
@@ -76,86 +74,19 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         title: 'Vidhatasharanam',
         theme: AppTheme.lightTheme,
-        home: const AppInitializer(),
+        initialRoute: AppConstants.navigateToSplashScreen,
+        routes: AppRoutes.getRoutes(),
+        onGenerateRoute: (settings) {
+          // Handle arguments for admin panel
+          if (settings.name == AppConstants.navigateToAdminPanel) {
+            final username = settings.arguments as String? ?? 'Admin';
+            return MaterialPageRoute(
+              builder: (_) => AdminPanel(username: username),
+            );
+          }
+          return null;
+        },
       ),
     );
-  }
-}
-
-class AppInitializer extends StatefulWidget {
-  const AppInitializer({super.key});
-
-  @override
-  State<AppInitializer> createState() => _AppInitializerState();
-}
-
-class _AppInitializerState extends State<AppInitializer> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _initializeApp());
-  }
-
-  Future<void> _initializeApp() async {
-    try {
-      // Try Firebase (but don’t block if it fails)
-      try {
-        await Firebase.initializeApp(
-          options: DefaultFirebaseOptions.currentPlatform,
-        );
-      } catch (e) {
-        debugPrint('⚠️ Firebase init failed: $e');
-      }
-
-      await AuthService.instance.init();
-
-      // ✅ Ensure HTTPS in SupabaseConfig
-      await SupabaseConfig.initialize();
-
-      final authService = AuthService.instance;
-
-      // Wait until AuthService finishes setup
-      while (!authService.isInitialized) {
-        await Future.delayed(const Duration(milliseconds: 50));
-      }
-
-      if (authService.isAuthenticated) {
-        await CommunityNotificationService.instance.initialize();
-      }
-
-      // Short splash delay for smoother UX
-      await Future.delayed(const Duration(milliseconds: 600));
-
-      // ✅ Always navigate after init (even if partial failure)
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder: (_, __, ___) => const AuthWrapper(),
-            transitionDuration: const Duration(milliseconds: 400),
-            transitionsBuilder: (_, animation, __, child) =>
-                FadeTransition(opacity: animation, child: child),
-          ),
-        );
-      }
-    } catch (e, stackTrace) {
-      AppLogger.error('App initialization error', error: e, stackTrace: stackTrace);
-
-      // ✅ Fail-safe navigation (never stay on blank screen)
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder: (_, __, ___) => const AuthWrapper(),
-            transitionDuration: const Duration(milliseconds: 400),
-            transitionsBuilder: (_, animation, __, child) =>
-                FadeTransition(opacity: animation, child: child),
-          ),
-        );
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return const SplashScreen();
   }
 }

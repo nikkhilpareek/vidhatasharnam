@@ -2,14 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:provider/provider.dart';
 
 import '../presentation/auth/login/login_screen.dart';
 import 'tabs/dashboard_tab.dart';
 import 'tabs/users_tab.dart';
 import 'tabs/visits_tab.dart';
 import 'tabs/community_admin_tab.dart';
-import 'admin_panel_view_model.dart';
 
 class AdminPanel extends StatefulWidget {
   final String username;
@@ -21,6 +19,7 @@ class AdminPanel extends StatefulWidget {
 
 class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  bool _creatingUser = false;
 
   @override
   void initState() {
@@ -135,11 +134,14 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
                       try {
                         final user = FirebaseAuth.instance.currentUser;
                         if (user != null) {
+                          // Reauthenticate with current password
                           final credential = EmailAuthProvider.credential(
                             email: user.email!,
                             password: currentPasswordController.text,
                           );
                           await user.reauthenticateWithCredential(credential);
+
+                          // Update password
                           await user.updatePassword(newPasswordController.text);
 
                           if (context.mounted) {
@@ -159,15 +161,22 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
                         } else if (e.code == 'weak-password') {
                           errorMessage = 'New password is too weak';
                         }
+                        
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+                            SnackBar(
+                              content: Text(errorMessage),
+                              backgroundColor: Colors.red,
+                            ),
                           );
                         }
                       } catch (e) {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                            SnackBar(
+                              content: Text('Error: $e'),
+                              backgroundColor: Colors.red,
+                            ),
                           );
                         }
                       } finally {
@@ -219,8 +228,6 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
 
     String? phoneNumber;
     bool _passwordVisible = false;
-
-    final vm = context.read<AdminPanelViewModel>();
 
     showDialog(
       context: context,
@@ -299,44 +306,84 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            Consumer<AdminPanelViewModel>(
-              builder: (context, model, _) => ElevatedButton(
-                onPressed: model.isCreatingUser
-                    ? null
-                    : () async {
-                        if (!formKey.currentState!.validate()) return;
-                        formKey.currentState!.save();
+            ElevatedButton(
+              onPressed: _creatingUser
+                  ? null
+                  : () async {
+                      if (!formKey.currentState!.validate()) return;
+
+                      setState(() {
+                        _creatingUser = true;
+                      });
+                      setStateDialog(() {});
+
+                      try {
+                        FirebaseApp secondaryApp;
                         try {
-                          await vm.createUser(
-                            username: usernameController.text.trim(),
-                            email: emailController.text.trim(),
-                            password: passwordController.text,
-                            phoneNumber: phoneNumber,
-                          );
-                          if (context.mounted) {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('User created successfully')),
-                            );
-                          }
-                        } on FirebaseAuthException catch (e) {
-                          String msg = e.message ?? e.code;
-                          if (e.code == 'email-already-in-use') {
-                            msg = 'This email is already registered.';
-                          }
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $msg')));
-                        } on FirebaseException catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Firestore Error: ${e.message}')),
-                          );
+                          secondaryApp = Firebase.app('Secondary');
                         } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                          secondaryApp = await Firebase.initializeApp(
+                            name: 'Secondary',
+                            options: Firebase.app().options,
+                          );
                         }
-                      },
-                child: model.isCreatingUser
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Create'),
-              ),
+
+                        final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
+
+                        final email = emailController.text.trim();
+                        final password = passwordController.text;
+                        final username = usernameController.text.trim();
+
+                        final UserCredential newUserCred = await secondaryAuth
+                            .createUserWithEmailAndPassword(email: email, password: password);
+
+                        final newUid = newUserCred.user!.uid;
+
+                        await FirebaseFirestore.instance.collection('users').doc(newUid).set({
+                          'username': username,
+                          'email': email,
+                          'phone': phoneNumber,
+                          'role': 'User',
+                          'active': true,
+                          'status': 'Active',
+                          'createdAt': FieldValue.serverTimestamp(),
+                        });
+
+                        try {
+                          await secondaryAuth.signOut();
+                          await secondaryApp.delete();
+                        } catch (_) {}
+
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('User created successfully')),
+                          );
+                        }
+                      } on FirebaseAuthException catch (e) {
+                        String msg = e.message ?? e.code;
+                        if (e.code == 'email-already-in-use') {
+                          msg = 'This email is already registered.';
+                        }
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $msg')));
+                      } on FirebaseException catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Firestore Error: ${e.message}')),
+                        );
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                      } finally {
+                        if (mounted) {
+                          setState(() {
+                            _creatingUser = false;
+                          });
+                        }
+                        setStateDialog(() {});
+                      }
+                    },
+              child: _creatingUser
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Create'),
             ),
           ],
         );
@@ -346,88 +393,85 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider<AdminPanelViewModel>(
-      create: (_) => AdminPanelViewModel(),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Admin Panel', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
-          backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.8),
-          elevation: 0,
-          iconTheme: const IconThemeData(color: Colors.white),
-          bottom: TabBar(
-            controller: _tabController,
-            indicatorColor: Colors.white,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            tabs: const [
-              Tab(text: 'Dashboard', icon: Icon(Icons.dashboard)),
-              Tab(text: 'Users', icon: Icon(Icons.people)),
-              Tab(text: 'Visits', icon: Icon(Icons.location_on)),
-              Tab(text: 'Community', icon: Icon(Icons.campaign)),
-            ],
-          ),
-        ),
-        drawer: Drawer(
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              DrawerHeader(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    const CircleAvatar(
-                      radius: 30,
-                      backgroundColor: Colors.white,
-                      child: Icon(Icons.admin_panel_settings, color: Colors.blue, size: 35),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Admin: ${widget.username}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.lock_outline),
-                title: const Text('Change Password'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showAdminPasswordChangeDialog();
-                },
-              ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.logout, color: Colors.red),
-                title: const Text('Logout', style: TextStyle(color: Colors.red)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _logout();
-                },
-              ),
-            ],
-          ),
-        ),
-        body: TabBarView(
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Admin Panel', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
+        backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.8),
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+        bottom: TabBar(
           controller: _tabController,
-          children: [
-            DashboardTab(
-              onCreateUser: _showCreateUserDialog,
-              onManageVisits: () => _tabController.animateTo(2),
-            ),
-            UsersTab(onCreateUser: _showCreateUserDialog),
-            const VisitsTab(),
-            const CommunityAdminTab(),
+          indicatorColor: Colors.white,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          tabs: const [
+            Tab(text: 'Dashboard', icon: Icon(Icons.dashboard)),
+            Tab(text: 'Users', icon: Icon(Icons.people)),
+            Tab(text: 'Visits', icon: Icon(Icons.location_on)),
+            Tab(text: 'Community', icon: Icon(Icons.campaign)),
           ],
         ),
+      ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  const CircleAvatar(
+                    radius: 30,
+                    backgroundColor: Colors.white,
+                    child: Icon(Icons.admin_panel_settings, color: Colors.blue, size: 35),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Admin: ${widget.username}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.lock_outline),
+              title: const Text('Change Password'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                _showAdminPasswordChangeDialog();
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: const Text('Logout', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                _logout();
+              },
+            ),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          DashboardTab(
+            onCreateUser: _showCreateUserDialog,
+            onManageVisits: () => _tabController.animateTo(2),
+          ),
+          UsersTab(onCreateUser: _showCreateUserDialog),
+          const VisitsTab(),
+          const CommunityAdminTab(),
+        ],
       ),
     );
   }

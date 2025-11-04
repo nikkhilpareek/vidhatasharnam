@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:vidhatasharnam/core/theme/app_theme.dart';
+import 'package:vidhatasharnam/core/config/app_constants.dart';
+import 'package:vidhatasharnam/data/datasources/auth/auth_service.dart';
+import 'package:vidhatasharnam/data/datasources/community/community_notification_service.dart';
 import 'package:vidhatasharnam/presentation/auth/login/login_view_model.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -34,16 +37,39 @@ class _LoginScreenState extends State<LoginScreen> {
       password: _passwordController.text,
     );
 
-    if (!mounted || success) return;
+    if (!mounted) return;
 
-    final errorMessage =
-        loginViewModel.errorMessage ?? 'Unable to sign in. Please try again.';
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(errorMessage),
-        backgroundColor: Colors.red,
-      ),
-    );
+    if (success) {
+      // Wait for AuthService to update
+      final authService = AuthService.instance;
+      while (!authService.isInitialized || !authService.isAuthenticated) {
+        await Future.delayed(const Duration(milliseconds: 50));
+      }
+
+      // Initialize Community Notification Service
+      await CommunityNotificationService.instance.initialize();
+
+      final userData = authService.userData!;
+      if (userData.role == "admin") {
+        Navigator.of(context).pushReplacementNamed(
+          AppConstants.navigateToAdminPanel,
+          arguments: userData.displayName,
+        );
+      } else {
+        Navigator.of(context).pushReplacementNamed(
+          AppConstants.navigateToHomeScreen,
+        );
+      }
+    } else {
+      final errorMessage =
+          loginViewModel.errorMessage ?? 'Unable to sign in. Please try again.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
