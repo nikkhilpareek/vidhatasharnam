@@ -16,6 +16,7 @@ import 'package:vidhatasharnam/core/exceptions/exception_handler.dart';
 import 'package:vidhatasharnam/data/repositories/auth_repository_impl.dart';
 import 'package:vidhatasharnam/domain/repositories/auth_repository.dart';
 import 'package:vidhatasharnam/presentation/auth/login/login_view_model.dart';
+import 'package:vidhatasharnam/config/supabase_config.dart';
 
 // Global variable to track initialization state
 bool _isInitialized = false;
@@ -209,6 +210,16 @@ Future<void> _initializeAsync() async {
     } catch (e) {
       // Firebase may already be initialized by AppDelegate
       debugPrint('⚠️ Firebase init note: $e');
+    }
+
+    // Initialize Supabase
+    final supabaseStartTime = DateTime.now();
+    try {
+      await SupabaseConfig.initialize();
+      debugPrint('⏱️ [TIMING] Supabase.initialize: ${DateTime.now().difference(supabaseStartTime).inMilliseconds}ms');
+    } catch (e) {
+      debugPrint('⚠️ Supabase initialization error: $e');
+      // Continue even if Supabase fails - it may be initialized elsewhere
     }
 
     // Initialize AuthService (if needed)

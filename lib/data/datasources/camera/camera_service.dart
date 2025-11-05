@@ -64,12 +64,26 @@ class CameraService {
     String extension = 'jpg',
   }) async {
     try {
+      // Defensive guard: Ensure Supabase is initialized before accessing client
+      if (!SupabaseConfig.isInitialized) {
+        debugPrint('⚠️ Supabase not initialized, attempting to initialize...');
+        try {
+          await SupabaseConfig.initialize();
+          debugPrint('✅ Supabase initialized successfully');
+        } catch (e) {
+          debugPrint('❌ Failed to initialize Supabase: $e');
+          throw Exception('Supabase not initialized. Cannot upload image. Error: $e');
+        }
+      }
+
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = 'visits/${userId}_${visitId}_$timestamp.$extension';
 
       debugPrint('☁️ Uploading $fileName to ${SupabaseConfig.visitPhotosBucket}');
 
-      final response = await SupabaseConfig.client.storage
+      // Access client with defensive guard
+      final client = SupabaseConfig.client;
+      final response = await client.storage
           .from(SupabaseConfig.visitPhotosBucket)
           .uploadBinary(fileName, fileBytes);
 
@@ -77,7 +91,7 @@ class CameraService {
 
       if (response.isEmpty) throw Exception('Upload failed - empty response');
 
-      final publicUrl = SupabaseConfig.client.storage
+      final publicUrl = client.storage
           .from(SupabaseConfig.visitPhotosBucket)
           .getPublicUrl(fileName);
 

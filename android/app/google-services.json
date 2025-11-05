@@ -7,6 +7,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:708295037460:android:f4ee65069c13e5fdd1cd01",
+        "android_client_info": {
+          "package_name": "com.vidhata.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA6HpmfXbmxLAoO3-blxT0MzqLWwQ0je2A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:708295037460:android:19b96c1dee7d44e2d1cd01",
         "android_client_info": {
           "package_name": "com.vidhatasharanam.app"
@@ -27,4 +46,3 @@
   ],
   "configuration_version": "1"
 }
-
