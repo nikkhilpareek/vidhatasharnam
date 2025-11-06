@@ -26,7 +26,7 @@
 -keep class com.google.gson.** { *; }
 
 ## Your app models (UPDATED TO USE v1 PACKAGE NAME)
--keep class com.vidhatasharanam.v1.** { *; }
+-keep class com.vidhatasharanam.app.** { *; }
 
 ## General Android
 -keep public class * extends android.app.Activity

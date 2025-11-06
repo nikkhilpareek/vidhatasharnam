@@ -1,0 +1,35 @@
+import UIKit
+import Flutter
+import FirebaseCore
+
+@main
+@objc class AppDelegate: FlutterAppDelegate {
+  var flutterEngine: FlutterEngine?
+
+  override func application(
+    _ application: UIApplication,
+    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+  ) -> Bool {
+
+    // Initialize Firebase once
+    if FirebaseApp.app() == nil {
+      FirebaseApp.configure()
+      print("✅ Firebase configured successfully (AppDelegate)")
+    }
+
+    // Initialize Flutter engine manually to ensure attach
+    flutterEngine = FlutterEngine(name: "my_engine")
+    flutterEngine?.run()
+    GeneratedPluginRegistrant.register(with: flutterEngine!)
+
+    // Create window manually (UIScene-safe)
+    self.window = UIWindow(frame: UIScreen.main.bounds)
+    let flutterViewController = FlutterViewController(engine: flutterEngine!, nibName: nil, bundle: nil)
+    self.window?.rootViewController = flutterViewController
+    self.window?.makeKeyAndVisible()
+
+    print("🚀 Flutter engine attached successfully, window visible ✅")
+
+    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+}
