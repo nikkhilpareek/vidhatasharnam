@@ -21,6 +21,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   bool _isPasswordVisible = false;
+  bool _isLoggingIn = false; // Local loading state that persists until navigation
 
   @override
   void dispose() {
@@ -32,78 +33,107 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final loginViewModel = context.read<LoginViewModel>();
-    final success = await loginViewModel.login(
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
-    );
+    // Set local loading state to true - this will persist until navigation
+    setState(() {
+      _isLoggingIn = true;
+    });
 
-    if (!mounted) return;
+    try {
+      final loginViewModel = context.read<LoginViewModel>();
+      final success = await loginViewModel.login(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
 
-    if (success) {
-      // Wait for AuthService to update and save login state
-      final authService = AuthService.instance;
-      debugPrint('[LoginScreen] Waiting for AuthService to be authenticated...');
-      
-      // Wait for authentication with timeout
-      int attempts = 0;
-      const maxAttempts = 100; // 5 seconds max wait
-      while ((!authService.isInitialized || !authService.isAuthenticated) && attempts < maxAttempts) {
-        await Future.delayed(const Duration(milliseconds: 50));
-        attempts++;
-      }
+      if (!mounted) return;
 
-      if (!authService.isAuthenticated) {
-        debugPrint('[LoginScreen] WARNING: AuthService not authenticated after wait');
+      if (success) {
+        // Wait for AuthService to update and save login state
+        final authService = AuthService.instance;
+        debugPrint('[LoginScreen] Waiting for AuthService to be authenticated...');
+        
+        // Wait for authentication with timeout
+        int attempts = 0;
+        const maxAttempts = 100; // 5 seconds max wait
+        while ((!authService.isInitialized || !authService.isAuthenticated) && attempts < maxAttempts) {
+          await Future.delayed(const Duration(milliseconds: 50));
+          attempts++;
+        }
+
+        if (!authService.isAuthenticated) {
+          debugPrint('[LoginScreen] WARNING: AuthService not authenticated after wait');
+          if (mounted) {
+            setState(() {
+              _isLoggingIn = false;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Login successful but authentication state not ready. Please try again.'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+          return;
+        }
+
+        // Verify session was saved to LocalStorage
+        final localStorage = LocalStorageService();
+        final isLoggedInSaved = localStorage.getBool(AppConstants.prefIsLoggedIn) ?? false;
+        debugPrint('[LoginScreen] Login flag saved to LocalStorage: $isLoggedInSaved');
+        
+        if (!isLoggedInSaved) {
+          debugPrint('[LoginScreen] ERROR: Login flag not saved! Waiting a bit more...');
+          await Future.delayed(const Duration(milliseconds: 200));
+          final retryCheck = localStorage.getBool(AppConstants.prefIsLoggedIn) ?? false;
+          debugPrint('[LoginScreen] Retry check result: $retryCheck');
+          
+          if (!retryCheck) {
+            debugPrint('[LoginScreen] CRITICAL: Login flag still not saved after retry!');
+          }
+        }
+
+        // AuthService has already saved login state via LocalStorageService
+        // Now navigate based on user role
+        final userData = authService.userData!;
+        debugPrint('[LoginScreen] Navigating to dashboard for role: ${userData.role}');
+        
+        // Keep loading state active during navigation
+        // Navigation will replace this screen, so we don't need to reset _isLoggingIn
+        if (userData.role == "admin") {
+          Navigator.of(context).pushReplacementNamed(
+            AppConstants.navigateToAdminPanel,
+            arguments: userData.displayName,
+          );
+        } else {
+          Navigator.of(context).pushReplacementNamed(
+            AppConstants.navigateToHomeScreen,
+          );
+        }
+      } else {
+        // Login failed, reset loading state
         if (mounted) {
+          setState(() {
+            _isLoggingIn = false;
+          });
+          final errorMessage =
+              loginViewModel.errorMessage ?? 'Unable to sign in. Please try again.';
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Login successful but authentication state not ready. Please try again.'),
-              backgroundColor: Colors.orange,
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.red,
             ),
           );
         }
-        return;
       }
-
-      // Verify session was saved to LocalStorage
-      final localStorage = LocalStorageService();
-      final isLoggedInSaved = localStorage.getBool(AppConstants.prefIsLoggedIn) ?? false;
-      debugPrint('[LoginScreen] Login flag saved to LocalStorage: $isLoggedInSaved');
-      
-      if (!isLoggedInSaved) {
-        debugPrint('[LoginScreen] ERROR: Login flag not saved! Waiting a bit more...');
-        await Future.delayed(const Duration(milliseconds: 200));
-        final retryCheck = localStorage.getBool(AppConstants.prefIsLoggedIn) ?? false;
-        debugPrint('[LoginScreen] Retry check result: $retryCheck');
-        
-        if (!retryCheck) {
-          debugPrint('[LoginScreen] CRITICAL: Login flag still not saved after retry!');
-        }
-      }
-
-      // AuthService has already saved login state via LocalStorageService
-      // Now navigate based on user role
-      final userData = authService.userData!;
-      debugPrint('[LoginScreen] Navigating to dashboard for role: ${userData.role}');
-      
-      if (userData.role == "admin") {
-        Navigator.of(context).pushReplacementNamed(
-          AppConstants.navigateToAdminPanel,
-          arguments: userData.displayName,
-        );
-      } else {
-        Navigator.of(context).pushReplacementNamed(
-          AppConstants.navigateToHomeScreen,
-        );
-      }
-    } else {
-      final errorMessage =
-          loginViewModel.errorMessage ?? 'Unable to sign in. Please try again.';
+    } catch (e) {
+      // Handle any unexpected errors
       if (mounted) {
+        setState(() {
+          _isLoggingIn = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(errorMessage),
+            content: Text('An error occurred: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -113,7 +143,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isLoading = context.select<LoginViewModel, bool>((vm) => vm.isLoading);
+    final viewModelLoading = context.select<LoginViewModel, bool>((vm) => vm.isLoading);
+    // Use local loading state OR viewModel loading state - show loading if either is true
+    final isLoading = _isLoggingIn || viewModelLoading;
 
     return PopScope(
       canPop: false, // Prevent back button navigation

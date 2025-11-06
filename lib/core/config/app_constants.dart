@@ -23,5 +23,6 @@ class AppConstants {
   static const String prefUserRole = 'pref_user_role';
   static const String prefDeviceRegistered = 'pref_device_registered';
   static const String prefRegisteredDeviceToken = 'pref_registered_device_token';
+  static const String prefCommunityLastChecked = 'pref_community_last_checked';
 }
 

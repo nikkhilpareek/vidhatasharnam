@@ -1,8 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 
 import 'package:vidhatasharnam/core/logger/app_logger.dart';
+import 'package:vidhatasharnam/core/config/app_constants.dart';
+import 'package:vidhatasharnam/domain/repositories/local_storage.dart';
 
 class CommunityNotificationService extends ChangeNotifier {
   static CommunityNotificationService? _instance;
@@ -14,6 +17,9 @@ class CommunityNotificationService extends ChangeNotifier {
   String? _latestAdminMessage;
   String? _latestChannelName;
   DateTime? _lastChecked;
+  bool _firestoreAvailable = true; // Track if Firestore is available (permissions)
+
+  final LocalStorageService _localStorage = LocalStorageService();
 
   int get unreadCount => _unreadCount;
   String? get latestAdminMessage => _latestAdminMessage;
@@ -32,28 +38,53 @@ class CommunityNotificationService extends ChangeNotifier {
   }
 
   Future<void> _loadLastCheckedTime(String userId) async {
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('user_community_state')
-          .doc(userId)
-          .get();
-      
-      if (doc.exists) {
-        final data = doc.data()!;
-        if (data['lastChecked'] is Timestamp) {
-          _lastChecked = (data['lastChecked'] as Timestamp).toDate();
+    // First, try to load from LocalStorage (primary storage)
+    _lastChecked = _localStorage.getDateTime(AppConstants.prefCommunityLastChecked);
+    
+    // If not in LocalStorage, try Firestore (if available)
+    if (_lastChecked == null && _firestoreAvailable) {
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('user_community_state')
+            .doc(userId)
+            .get();
+        
+        if (doc.exists) {
+          final data = doc.data()!;
+          if (data['lastChecked'] is Timestamp) {
+            _lastChecked = (data['lastChecked'] as Timestamp).toDate();
+            // Save to LocalStorage for future use
+            await _localStorage.saveDateTime(AppConstants.prefCommunityLastChecked, _lastChecked!);
+          }
+        }
+      } catch (e) {
+        // Check if it's a permission error
+        final isPermissionError = _isPermissionError(e);
+        if (isPermissionError) {
+          // Silently handle permission errors - Firestore not available
+          _firestoreAvailable = false;
+          if (kDebugMode) {
+            debugPrint('[CommunityNotificationService] Firestore permissions not available, using LocalStorage only');
+          }
+        } else {
+          // Log other errors but don't fail
+          AppLogger.error(
+            'Error loading last checked time from Firestore for user $userId',
+            error: e,
+          );
         }
       }
-      
-      // If no last checked time, use current time
-      _lastChecked ??= DateTime.now();
-    } catch (e, stackTrace) {
-      AppLogger.error(
-        'Error loading last checked time for user $userId',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      _lastChecked = DateTime.now();
+    }
+    
+    // If still no last checked time, use current time
+    _lastChecked ??= DateTime.now();
+    
+    // Save to LocalStorage if not already saved
+    if (_lastChecked != null) {
+      final saved = _localStorage.getDateTime(AppConstants.prefCommunityLastChecked);
+      if (saved == null) {
+        await _localStorage.saveDateTime(AppConstants.prefCommunityLastChecked, _lastChecked!);
+      }
     }
   }
 
@@ -63,7 +94,8 @@ class CommunityNotificationService extends ChangeNotifier {
         .collection('channels')
         .where('members', arrayContains: userId)
         .snapshots()
-        .listen((channelsSnapshot) {
+        .listen(
+          (channelsSnapshot) {
       
       int totalUnread = 0;
       String? latestMessage;
@@ -82,7 +114,8 @@ class CommunityNotificationService extends ChangeNotifier {
             .where('createdAt', isGreaterThan: Timestamp.fromDate(_lastChecked!))
             .orderBy('createdAt', descending: true)
             .snapshots()
-            .listen((messagesSnapshot) {
+            .listen(
+              (messagesSnapshot) {
           
           int channelUnread = 0;
           
@@ -120,9 +153,32 @@ class CommunityNotificationService extends ChangeNotifier {
             totalUnread += channelUnread;
             _updateNotificationState(totalUnread, latestMessage, latestChannel);
           }
-        });
+        },
+        onError: (error) {
+          // Handle permission errors for message listeners gracefully
+          if (_isPermissionError(error)) {
+            if (kDebugMode) {
+              debugPrint('[CommunityNotificationService] Permission denied for messages in channel ${channelDoc.id}');
+            }
+          }
+        },
+        );
       }
-    });
+    },
+    onError: (error) {
+      // Handle permission errors gracefully
+      if (_isPermissionError(error)) {
+        if (kDebugMode) {
+          debugPrint('[CommunityNotificationService] Permission denied for channels, skipping message listening');
+        }
+      } else {
+        AppLogger.error(
+          'Error listening for admin messages',
+          error: error,
+        );
+      }
+    },
+    );
   }
 
   void _updateNotificationState(int count, String? message, String? channel) {
@@ -136,53 +192,78 @@ class CommunityNotificationService extends ChangeNotifier {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    try {
-      // Update last checked time
-      await FirebaseFirestore.instance
-          .collection('user_community_state')
-          .doc(user.uid)
-          .set({
-        'lastChecked': FieldValue.serverTimestamp(),
-        'userId': user.uid,
-      }, SetOptions(merge: true));
+    // Always update LocalStorage (primary storage)
+    _lastChecked = DateTime.now();
+    await _localStorage.saveDateTime(AppConstants.prefCommunityLastChecked, _lastChecked!);
 
-      // Reset counters
-      _unreadCount = 0;
-      _latestAdminMessage = null;
-      _latestChannelName = null;
-      _lastChecked = DateTime.now();
-      
-      notifyListeners();
-    } catch (e, stackTrace) {
-      AppLogger.error(
-        'Error marking community messages as read for user ${user.uid}',
-        error: e,
-        stackTrace: stackTrace,
-      );
+    // Try to update Firestore if available (optional)
+    if (_firestoreAvailable) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('user_community_state')
+            .doc(user.uid)
+            .set({
+          'lastChecked': FieldValue.serverTimestamp(),
+          'userId': user.uid,
+        }, SetOptions(merge: true));
+      } catch (e) {
+        // Check if it's a permission error
+        final isPermissionError = _isPermissionError(e);
+        if (isPermissionError) {
+          // Silently handle permission errors - Firestore not available
+          _firestoreAvailable = false;
+          if (kDebugMode) {
+            debugPrint('[CommunityNotificationService] Firestore permissions not available, using LocalStorage only');
+          }
+        } else {
+          // Log other errors but don't fail
+          AppLogger.error(
+            'Error marking community messages as read in Firestore for user ${user.uid}',
+            error: e,
+          );
+        }
+      }
     }
+
+    // Reset counters (always do this regardless of Firestore success)
+    _unreadCount = 0;
+    _latestAdminMessage = null;
+    _latestChannelName = null;
+    
+    notifyListeners();
   }
 
   // Stream that provides unread count
   Stream<int> getUnreadCountStream(String userId) {
+    // If Firestore is not available, return a stream that emits 0
+    if (!_firestoreAvailable) {
+      return Stream.value(0);
+    }
+
     return FirebaseFirestore.instance
         .collection('user_community_state')
         .doc(userId)
         .snapshots()
         .asyncMap((doc) async {
       try {
-        // Initialize user state if it doesn't exist
-        if (!doc.exists) {
-          await FirebaseFirestore.instance
-              .collection('user_community_state')
-              .doc(userId)
-              .set({
-            'lastChecked': FieldValue.serverTimestamp(),
-          });
-          return 0;
+        // Get lastChecked from LocalStorage first, then Firestore
+        DateTime? lastChecked;
+        final localLastChecked = _localStorage.getDateTime(AppConstants.prefCommunityLastChecked);
+        
+        if (doc.exists) {
+          final data = doc.data()!;
+          final firestoreLastChecked = data['lastChecked'] as Timestamp?;
+          if (firestoreLastChecked != null) {
+            lastChecked = firestoreLastChecked.toDate();
+            // Sync to LocalStorage
+            if (localLastChecked == null || lastChecked.isAfter(localLastChecked)) {
+              await _localStorage.saveDateTime(AppConstants.prefCommunityLastChecked, lastChecked);
+            }
+          }
         }
-
-        final data = doc.data()!;
-        final lastChecked = data['lastChecked'] as Timestamp?;
+        
+        // Use LocalStorage value if Firestore doesn't have it
+        lastChecked ??= localLastChecked;
         
         if (lastChecked == null) return 0;
 
@@ -229,13 +310,48 @@ class CommunityNotificationService extends ChangeNotifier {
 
         return totalUnread;
       } catch (e, stackTrace) {
-        AppLogger.error(
-          'Error calculating unread count for user $userId',
-          error: e,
-          stackTrace: stackTrace,
-        );
+        // Check if it's a permission error
+        final isPermissionError = _isPermissionError(e);
+        if (isPermissionError) {
+          // Silently handle permission errors - Firestore not available
+          _firestoreAvailable = false;
+          if (kDebugMode) {
+            debugPrint('[CommunityNotificationService] Firestore permissions not available, using LocalStorage only');
+          }
+        } else {
+          // Log other errors but don't fail
+          AppLogger.error(
+            'Error calculating unread count for user $userId',
+            error: e,
+            stackTrace: stackTrace,
+          );
+        }
         return 0;
       }
+    }).handleError((error) {
+      // Handle stream errors gracefully
+      if (_isPermissionError(error)) {
+        _firestoreAvailable = false;
+        if (kDebugMode) {
+          debugPrint('[CommunityNotificationService] Firestore permissions not available, using LocalStorage only');
+        }
+      }
+      return 0;
     });
+  }
+
+  /// Helper method to check if an error is a permission error
+  bool _isPermissionError(dynamic error) {
+    if (error == null) return false;
+    
+    // Check for FirebaseException with permission-denied code
+    if (error is FirebaseException) {
+      return error.code == 'permission-denied';
+    }
+    
+    // Check error string for permission-denied
+    final errorString = error.toString().toLowerCase();
+    return errorString.contains('permission-denied') || 
+           errorString.contains('permission_denied');
   }
 }

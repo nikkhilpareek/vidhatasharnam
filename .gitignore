@@ -52,3 +52,28 @@ gradle-wrapper.jar
 /local.properties
 GeneratedPluginRegistrant.java
 
+# iOS build artifacts
+ios/build/
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+ios/Flutter/app.flx
+ios/Flutter/app.zip
+ios/Flutter/flutter_assets/
+ios/Flutter/flutter_export_environment.sh
+ios/ServiceDefinitions.json
+ios/Runner/GeneratedPluginRegistrant.*
+
+# Temporary files and reports
+*.txt
+*.md
+!README.md
+.cursor_backups/
+rollback_report.txt
+*_diagnostic_report.txt
+*_FIX.md
+*_OPTIMIZATION.md
+

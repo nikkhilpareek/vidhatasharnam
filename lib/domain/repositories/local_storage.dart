@@ -31,6 +31,11 @@ class LocalStorageService {
     await _preferences?.setInt(key, value);
   }
 
+  Future<void> saveDateTime(String key, DateTime value) async {
+    debugPrint('[LocalStorage] Saving DateTime - Key: $key, Value: ${value.toIso8601String()}');
+    await _preferences?.setString(key, value.toIso8601String());
+  }
+
   Future<void> saveBool(String key, bool value) async {
     debugPrint('[LocalStorage] Saving bool - Key: $key, Value: $value');
     await _preferences?.setBool(key, value);
@@ -49,6 +54,22 @@ class LocalStorageService {
     final value = _preferences?.getInt(key);
     debugPrint('[LocalStorage] Getting int - Key: $key, Value: $value');
     return value;
+  }
+
+  DateTime? getDateTime(String key) {
+    final value = _preferences?.getString(key);
+    if (value == null) {
+      debugPrint('[LocalStorage] Getting DateTime - Key: $key, Value: NULL');
+      return null;
+    }
+    try {
+      final dateTime = DateTime.parse(value);
+      debugPrint('[LocalStorage] Getting DateTime - Key: $key, Value: ${dateTime.toIso8601String()}');
+      return dateTime;
+    } catch (e) {
+      debugPrint('[LocalStorage] Error parsing DateTime - Key: $key, Value: $value, Error: $e');
+      return null;
+    }
   }
 
   bool? getBool(String key) {
