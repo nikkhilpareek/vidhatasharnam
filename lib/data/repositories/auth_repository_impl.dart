@@ -1,12 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 
 import 'package:vidhatasharnam/core/exceptions/app_exception.dart';
 import 'package:vidhatasharnam/core/logger/app_logger.dart';
 import 'package:vidhatasharnam/data/datasources/auth/auth_service.dart';
 import 'package:vidhatasharnam/domain/repositories/auth_repository.dart';
-import 'package:vidhatasharnam/config/supabase_config.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
   AuthRepositoryImpl({required AuthService authService}) : _authService = authService;
@@ -51,28 +50,29 @@ class AuthRepositoryImpl implements AuthRepository {
     required String password,
   }) async {
     try {
-      AppLogger.info('Registering user in Supabase: $email');
+      AppLogger.info('Registering user in Firestore: $email');
       
-      final supabase = SupabaseConfig.client;
+      final emailLower = email.toLowerCase().trim();
       
-      // Check if user already exists in users table
-      final existingUser = await supabase
-          .from('users')
-          .select('id, email')
-          .eq('email', email.toLowerCase())
-          .maybeSingle();
+      // Check if user already exists in Firestore
+      final existingUsers = await FirebaseFirestore.instance
+          .collection('users')
+          .where('email', isEqualTo: emailLower)
+          .limit(1)
+          .get();
       
-      if (existingUser != null) {
+      if (existingUsers.docs.isNotEmpty) {
         throw const ValidationException('An account with this email already exists.');
       }
       
-      // Check Firebase Auth for existing user (for backward compatibility)
+      // Check Firebase Auth for existing user
       try {
         await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: email.toLowerCase(),
+          email: emailLower,
           password: password,
         );
-        // If successful, user already exists in Firebase
+        // If successful, user already exists in Firebase Auth
+        await FirebaseAuth.instance.signOut(); // Sign out immediately
         throw const ValidationException('An account with this email already exists.');
       } on FirebaseAuthException catch (e) {
         // If user not found, that's expected - continue with registration
@@ -81,74 +81,59 @@ class AuthRepositoryImpl implements AuthRepository {
           if (e.code == 'invalid-email') {
             throw const ValidationException('The email address is invalid.');
           }
+          // Re-throw other unexpected errors
+          throw const ValidationException('Registration failed. Please try again.');
         }
       }
       
-      // Create user in Supabase Auth (handles password hashing automatically)
-      final response = await supabase.auth.signUp(
-        email: email.toLowerCase(),
+      // Create user in Firebase Auth (matches admin pattern)
+      final UserCredential userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+        email: emailLower,
         password: password,
-        data: {
-          'name': name,
-          'phone': phone,
-        },
       );
       
-      if (response.user == null) {
+      if (userCredential.user == null) {
         throw const ValidationException('Failed to create user account. Please try again.');
       }
       
-      final userId = response.user!.id;
+      final newUid = userCredential.user!.uid;
       
-      // Insert user data into Supabase users table
-      // Note: Password is stored in Supabase Auth, not in the users table for security
-      await supabase.from('users').insert({
-        'id': userId,
-        'name': name,
-        'email': email.toLowerCase(),
+      // Create Firestore user document (matches admin pattern exactly)
+      // Admin uses: username, email, phone, role: 'User', active: true, status: 'Active'
+      // Registration uses same fields but with isApproved: false, active: false
+      await FirebaseFirestore.instance.collection('users').doc(newUid).set({
+        'username': name, // Admin uses 'username' field
+        'name': name, // Also include 'name' for consistency
+        'email': emailLower,
         'phone': phone,
-        'isApproved': false,
-        'createdAt': DateTime.now().toIso8601String(),
+        'role': 'user', // Admin uses 'User' but we'll use lowercase for consistency
+        'active': false, // Inactive until approved (admin sets to true)
+        'status': 'Pending', // Status for pending approval (admin sets to 'Active')
+        'isApproved': false, // NEW: registration default
+        'createdAt': FieldValue.serverTimestamp(),
       });
       
-      // Also create Firebase Auth user for compatibility with existing login system
-      // User won't be able to login until approved (checked in AuthService.signIn)
-      try {
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: email.toLowerCase(),
-          password: password,
-        );
-        
-        // Create Firestore user document
-        final firebaseUser = FirebaseAuth.instance.currentUser;
-        if (firebaseUser != null) {
-          await FirebaseFirestore.instance.collection('users').doc(firebaseUser.uid).set({
-            'name': name,
-            'email': email.toLowerCase(),
-            'phone': phone,
-            'role': 'user',
-            'active': false, // Inactive until approved
-            'createdAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-          
-          // Sign out immediately - user needs approval before they can login
-          await FirebaseAuth.instance.signOut();
-        }
-      } catch (e) {
-        // If Firebase Auth creation fails, log but don't fail registration
-        // Supabase registration is primary
-        AppLogger.warning('Could not create Firebase Auth user during registration: $e');
-      }
+      // Sign out immediately - user needs approval before they can login
+      await FirebaseAuth.instance.signOut();
       
-      AppLogger.info('User registered successfully in Supabase: $email');
+      AppLogger.info('User registered successfully in Firestore: $email');
       
     } catch (error, stackTrace) {
+      // Log to Crashlytics
+      FirebaseCrashlytics.instance.recordError(error, stackTrace, reason: 'Registration failed');
       AppLogger.error('Registration failed in repository', error: error, stackTrace: stackTrace);
       throw _mapError(error, stackTrace);
     }
   }
 
   AppException _mapError(Object error, StackTrace stackTrace) {
+    // Check for approval pending message first
+    final errorString = error.toString().toLowerCase();
+    if (errorString.contains('pending approval')) {
+      return const UnauthorizedException('Your account is pending approval by admin. Please try again later.');
+    }
+    
     if (error is FirebaseAuthException) {
       switch (error.code) {
         case 'user-disabled':
@@ -168,22 +153,13 @@ class AuthRepositoryImpl implements AuthRepository {
       }
     }
 
-    if (error is AuthException) {
-      // Supabase Auth errors
-      if (error.message.contains('already registered') || 
-          error.message.contains('already exists')) {
-        return const ValidationException('An account with this email already exists.');
+    if (error is FirebaseException) {
+      // Firestore errors
+      if (error.code == 'permission-denied') {
+        return const ValidationException('Permission denied. Please contact support.');
       }
-      if (error.message.contains('password') && error.message.contains('weak')) {
-        return const ValidationException('Password is too weak. Please choose a stronger password.');
-      }
-      return ValidationException('Registration error: ${error.message}');
-    }
-
-    if (error is PostgrestException) {
-      // Supabase database errors
-      if (error.code == '23505') { // Unique constraint violation
-        return const ValidationException('An account with this email already exists.');
+      if (error.code == 'unavailable') {
+        return const NetworkException('Network error. Please check your connection and try again.');
       }
       return ValidationException('Database error: ${error.message}');
     }

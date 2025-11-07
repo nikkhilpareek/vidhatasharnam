@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'package:vidhatasharnam/core/logger/app_logger.dart';
 import 'package:vidhatasharnam/core/config/app_constants.dart';
 import 'package:vidhatasharnam/domain/repositories/local_storage.dart';
-import 'package:vidhatasharnam/config/supabase_config.dart';
 
 enum AuthStatus {
   unknown,
@@ -224,46 +223,7 @@ class AuthService extends ChangeNotifier {
       _status = AuthStatus.loading;
       notifyListeners();
 
-      // First, check approval status in Supabase users table
-      // Only check if Supabase is available and user exists there
-      try {
-        final supabase = SupabaseConfig.client;
-        final userData = await supabase
-            .from('users')
-            .select('id, email, isApproved')
-            .eq('email', email.toLowerCase())
-            .maybeSingle();
-
-        if (userData != null) {
-          final isApproved = userData['isApproved'] ?? false;
-          if (!isApproved) {
-            // Sign out any existing Firebase session
-            try {
-              await FirebaseAuth.instance.signOut();
-            } catch (_) {
-              // Ignore sign out errors
-            }
-            _status = AuthStatus.unauthenticated;
-            notifyListeners();
-            throw Exception('Your account is pending approval. Please wait for admin approval.');
-          }
-          // User is approved, continue with Firebase Auth
-          debugPrint('[AuthService] User approved in Supabase, proceeding with Firebase Auth');
-        } else {
-          // User not found in Supabase, continue with Firebase Auth (for backward compatibility with existing users)
-          debugPrint('[AuthService] User not found in Supabase, continuing with Firebase Auth (backward compatibility)');
-        }
-      } catch (e) {
-        // If error contains approval message, rethrow it
-        if (e.toString().contains('pending approval')) {
-          _status = AuthStatus.unauthenticated;
-          notifyListeners();
-          rethrow;
-        }
-        // For other Supabase errors, log but continue with Firebase Auth
-        debugPrint('[AuthService] Supabase check error: $e, continuing with Firebase Auth');
-      }
-
+      // Sign in with Firebase Auth first
       final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
@@ -274,6 +234,51 @@ class AuthService extends ChangeNotifier {
       }
 
       debugPrint('[AuthService] Firebase signIn successful, user: ${credential.user!.uid}');
+      
+      // Check approval status in Firestore users collection
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(credential.user!.uid)
+            .get();
+
+        if (!userDoc.exists) {
+          // User document doesn't exist - allow login for backward compatibility
+          debugPrint('[AuthService] User document not found in Firestore, allowing login (backward compatibility)');
+        } else {
+          final userData = userDoc.data();
+          if (userData != null) {
+            final isApproved = userData['isApproved'] ?? false;
+            
+            // For backward compatibility, if isApproved field doesn't exist, check 'active' field
+            // Existing users without isApproved field should be treated as approved
+            final isActive = userData['active'] ?? true;
+            final shouldAllowLogin = isApproved || (userData['isApproved'] == null && isActive);
+            
+            if (!shouldAllowLogin) {
+              // Sign out immediately - user is not approved
+              try {
+                await FirebaseAuth.instance.signOut();
+              } catch (_) {
+                // Ignore sign out errors
+              }
+              _status = AuthStatus.unauthenticated;
+              notifyListeners();
+              throw Exception('Your account is pending approval by admin. Please try again later.');
+            }
+            debugPrint('[AuthService] User approved in Firestore, proceeding with session setup');
+          }
+        }
+      } catch (e) {
+        // If error contains approval message, rethrow it
+        if (e.toString().contains('pending approval')) {
+          _status = AuthStatus.unauthenticated;
+          notifyListeners();
+          rethrow;
+        }
+        // For other Firestore errors, log but continue (don't block login for network issues)
+        debugPrint('[AuthService] Firestore approval check error: $e, continuing with login');
+      }
       
       // Ensure user data is verified and saved immediately
       // Don't rely solely on _onAuthStateChanged callback timing

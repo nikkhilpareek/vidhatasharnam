@@ -54,14 +54,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
 
       if (success) {
-        // Show success dialog
+        // Show success dialog with pending approval message
         showDialog(
           context: context,
           barrierDismissible: false,
           builder: (context) => AlertDialog(
-            title: const Text('Registration Submitted'),
+            title: Row(
+              children: [
+                Icon(
+                  Icons.pending_actions,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                const Text('Registration Submitted'),
+              ],
+            ),
             content: const Text(
-              'Your registration has been submitted for approval. You will be notified once your account is approved.',
+              'Your registration is pending approval by admin.',
             ),
             actions: [
               TextButton(

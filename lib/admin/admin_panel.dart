@@ -363,6 +363,7 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
 
                         final newUid = newUserCred.user!.uid;
 
+                        // Create user in Firestore (admin-created users are auto-approved)
                         await FirebaseFirestore.instance.collection('users').doc(newUid).set({
                           'username': username,
                           'email': email,
@@ -370,6 +371,7 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
                           'role': 'User',
                           'active': true,
                           'status': 'Active',
+                          'isApproved': true, // Admin-created users are auto-approved
                           'createdAt': FieldValue.serverTimestamp(),
                         });
 
