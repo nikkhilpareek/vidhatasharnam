@@ -12,6 +12,12 @@ class ExceptionHandler {
       return error.message;
     }
 
+    // Check for approval pending message
+    final errorString = error.toString().toLowerCase();
+    if (errorString.contains('pending approval') || errorString.contains('wait for admin')) {
+      return 'Your account is pending approval. Please wait for admin approval.';
+    }
+
     if (error is FirebaseAuthException) {
       AppLogger.warning('FirebaseAuthException intercepted', error: error, stackTrace: stackTrace);
       switch (error.code) {

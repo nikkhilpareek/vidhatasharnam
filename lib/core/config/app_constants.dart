@@ -2,6 +2,7 @@ class AppConstants {
   // Auth routes
   static const String navigateToSplashScreen = '/';
   static const String navigateToLoginScreen = '/login';
+  static const String navigateToRegisterScreen = '/register';
   static const String navigateToHomeScreen = '/home';
   static const String navigateToAdminPanel = '/admin';
 
@@ -24,5 +25,8 @@ class AppConstants {
   static const String prefDeviceRegistered = 'pref_device_registered';
   static const String prefRegisteredDeviceToken = 'pref_registered_device_token';
   static const String prefCommunityLastChecked = 'pref_community_last_checked';
+  
+  // Admin routes
+  static const String navigateToApproveUsers = '/admin/approve-users';
 }
 

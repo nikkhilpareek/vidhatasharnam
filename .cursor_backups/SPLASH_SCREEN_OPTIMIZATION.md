@@ -111,3 +111,4 @@ All original files backed up in `.cursor_backups/`:
 - Firebase is initialized in both AppDelegate (for early availability) and main.dart (with options). The AppDelegate check `if FirebaseApp.app() == nil` prevents double initialization.
 - Pre-warmed Flutter engine ensures faster first frame rendering
 
+

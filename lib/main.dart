@@ -16,6 +16,7 @@ import 'package:vidhatasharnam/core/exceptions/exception_handler.dart';
 import 'package:vidhatasharnam/data/repositories/auth_repository_impl.dart';
 import 'package:vidhatasharnam/domain/repositories/auth_repository.dart';
 import 'package:vidhatasharnam/presentation/auth/login/login_view_model.dart';
+import 'package:vidhatasharnam/presentation/auth/register/register_view_model.dart';
 import 'package:vidhatasharnam/config/supabase_config.dart';
 
 // Global variable to track initialization state
@@ -251,6 +252,12 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<LoginViewModel>(
           create: (context) => LoginViewModel(
+            authRepository: context.read<AuthRepository>(),
+            exceptionHandler: context.read<ExceptionHandler>(),
+          ),
+        ),
+        ChangeNotifierProvider<RegisterViewModel>(
+          create: (context) => RegisterViewModel(
             authRepository: context.read<AuthRepository>(),
             exceptionHandler: context.read<ExceptionHandler>(),
           ),
