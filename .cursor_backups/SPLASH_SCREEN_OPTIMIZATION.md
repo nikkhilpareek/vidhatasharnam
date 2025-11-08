@@ -112,3 +112,4 @@ All original files backed up in `.cursor_backups/`:
 - Pre-warmed Flutter engine ensures faster first frame rendering
 
 
+

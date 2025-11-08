@@ -334,7 +334,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 SizedBox(
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: isLoading ? null : _register,
+                    onPressed: (){
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text("Registered !! Please Contact Admin "),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Theme.of(context).colorScheme.primary,
                       foregroundColor: Colors.white,
