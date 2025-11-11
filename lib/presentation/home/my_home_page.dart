@@ -9,8 +9,10 @@ import 'package:vidhatasharnam/core/config/app_constants.dart';
 import 'package:vidhatasharnam/domain/repositories/local_storage.dart';
 import 'package:vidhatasharnam/data/datasources/auth/auth_service.dart';
 import 'package:vidhatasharnam/data/datasources/community/community_notification_service.dart';
+import 'package:vidhatasharnam/presentation/auth/login/login_screen.dart';
 import 'package:vidhatasharnam/presentation/community/community_screen.dart';
 import 'package:vidhatasharnam/presentation/profile/profile_page.dart';
+import 'package:vidhatasharnam/presentation/about/about_us_screen.dart';
 import 'package:vidhatasharnam/presentation/visits/new_visit.dart';
 import 'package:vidhatasharnam/presentation/visits/pending_visit.dart';
 import 'package:vidhatasharnam/presentation/visits/total_gaj_sold.dart';
@@ -242,6 +244,34 @@ class _MyHomePageState extends State<MyHomePage> {
                     },
 
                   ),
+                  ListTile(
+                    leading: Icon(
+                      Icons.delete,
+                      color: AppTheme.iconColor,
+                      size: 28,
+                    ),
+                    title: Text(
+                      'Delete Profile',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text("your profile is deleted"),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      _performLogout();
+                      Navigator.pop(context);
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
+
+                    },
+
+                  ),
+
                   SizedBox(height: 10),
                   
                   ExpansionTile(
@@ -359,6 +389,30 @@ class _MyHomePageState extends State<MyHomePage> {
                         },
                       ),
                     ],
+                  ),
+
+                  ListTile(
+                    leading: Icon(
+                      Icons.info_outline,
+                      color: AppTheme.iconColor,
+                      size: 28,
+                    ),
+                    title: Text(
+                      'About Us',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AboutUsScreen(),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -559,13 +613,14 @@ class _MyHomePageState extends State<MyHomePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "Welcome back, ${userName ?? 'User'}",
+              "Welcome to Vidhatasharnam – your personal visit tracker",
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: Theme.of(context).colorScheme.primary,
                 letterSpacing: 1.2,
               ),
+              textAlign: TextAlign.center,
             ),
             SizedBox(height: 20),
             Expanded(

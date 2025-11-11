@@ -16,6 +16,9 @@ class AppConstants {
   // Community routes
   static const String navigateToCommunity = '/community';
 
+  // About routes
+  static const String navigateToAboutUs = '/about-us';
+
   // LocalStorage keys
   static const String prefIsLoggedIn = 'pref_is_logged_in';
   static const String prefUserToken = 'pref_user_token';

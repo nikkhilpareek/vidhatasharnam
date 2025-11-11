@@ -39,12 +39,7 @@ class RegisterViewModel extends BaseViewModel {
         setState(ViewState.error);
         return false;
       }
-      
-      if (phone.trim().isEmpty) {
-        _errorMessage = 'Please enter your mobile number';
-        setState(ViewState.error);
-        return false;
-      }
+
       
       if (password.length < 6) {
         _errorMessage = 'Password must be at least 6 characters';
