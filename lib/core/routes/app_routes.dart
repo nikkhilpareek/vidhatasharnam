@@ -10,6 +10,7 @@ import 'package:vidhatasharnam/presentation/visits/my_visits_screen.dart';
 import 'package:vidhatasharnam/presentation/profile/profile_page.dart';
 import 'package:vidhatasharnam/presentation/community/community_screen.dart';
 import 'package:vidhatasharnam/presentation/admin/approve_users_screen.dart';
+import 'package:vidhatasharnam/presentation/about/about_us_screen.dart';
 import 'package:vidhatasharnam/core/config/app_constants.dart';
 
 class AppRoutes {
@@ -34,6 +35,9 @@ class AppRoutes {
 
       // Community routes
       AppConstants.navigateToCommunity: (context) => const CommunityScreen(),
+
+      // About routes
+      AppConstants.navigateToAboutUs: (context) => const AboutUsScreen(),
 
       // Admin routes
       AppConstants.navigateToApproveUsers: (context) => const ApproveUsersScreen(),

@@ -181,11 +181,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Fill in your details to register',
+                        'New users can register directly to get started — open for everyone.',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.grey.shade600,
+                          fontStyle: FontStyle.italic,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withOpacity(0.8),
+                          letterSpacing: 0.5,
                         ),
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
