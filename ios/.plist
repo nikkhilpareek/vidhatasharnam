@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>AIzaSyAVSAaXxDkEXTHVryETTP48US7QW5seW9E</string>
+	<key>GCM_SENDER_ID</key>
+	<string>708295037460</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.vidhatasharanam.app</string>
+	<key>PROJECT_ID</key>
+	<string>vidhata-811df</string>
+	<key>STORAGE_BUCKET</key>
+	<string>vidhata-811df.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false/>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false/>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true/>
+	<key>IS_GCM_ENABLED</key>
+	<true/>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true/>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:708295037460:ios:3ab8d92c880a30bbd1cd01</string>
+</dict>
+</plist>

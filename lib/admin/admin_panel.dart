@@ -3,7 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../login_screen.dart';
+import '../presentation/auth/login/login_screen.dart';
+import '../core/config/app_constants.dart';
+import '../data/datasources/auth/auth_service.dart';
 import 'tabs/dashboard_tab.dart';
 import 'tabs/users_tab.dart';
 import 'tabs/visits_tab.dart';
@@ -203,14 +205,36 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
           title: const Text('Logout'),
           content: const Text('Are you sure you want to logout?'),
           actions: [
-            TextButton(child: const Text('Cancel'), onPressed: () => Navigator.of(context).pop()),
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
             TextButton(
               child: const Text('Logout', style: TextStyle(color: Colors.red)),
               onPressed: () async {
                 Navigator.of(context).pop();
-                await FirebaseAuth.instance.signOut();
-                if (context.mounted) {
-                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+                
+                try {
+                  // Use AuthService to sign out (this will clear LocalStorageService)
+                  await AuthService.instance.signOut();
+                  
+                  // Navigate to login screen and prevent back navigation
+                  if (context.mounted) {
+                    Navigator.of(context).pushReplacementNamed(
+                      AppConstants.navigateToLoginScreen,
+                    );
+                  }
+                } catch (e) {
+                  // Show error message
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error logging out: $e'),
+                        backgroundColor: Colors.red,
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                  }
                 }
               },
             ),
@@ -339,6 +363,7 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
 
                         final newUid = newUserCred.user!.uid;
 
+                        // Create user in Firestore (admin-created users are auto-approved)
                         await FirebaseFirestore.instance.collection('users').doc(newUid).set({
                           'username': username,
                           'email': email,
@@ -346,6 +371,7 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
                           'role': 'User',
                           'active': true,
                           'status': 'Active',
+                          'isApproved': true, // Admin-created users are auto-approved
                           'createdAt': FieldValue.serverTimestamp(),
                         });
 
@@ -373,9 +399,11 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
                       } catch (e) {
                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
                       } finally {
-                        setState(() {
-                          _creatingUser = false;
-                        });
+                        if (mounted) {
+                          setState(() {
+                            _creatingUser = false;
+                          });
+                        }
                         setStateDialog(() {});
                       }
                     },
