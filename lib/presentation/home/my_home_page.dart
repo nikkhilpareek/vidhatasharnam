@@ -9,6 +9,7 @@ import 'package:vidhatasharnam/core/config/app_constants.dart';
 import 'package:vidhatasharnam/domain/repositories/local_storage.dart';
 import 'package:vidhatasharnam/data/datasources/auth/auth_service.dart';
 import 'package:vidhatasharnam/data/datasources/community/community_notification_service.dart';
+import 'package:vidhatasharnam/presentation/auth/login/login_screen.dart';
 import 'package:vidhatasharnam/presentation/community/community_screen.dart';
 import 'package:vidhatasharnam/presentation/profile/profile_page.dart';
 import 'package:vidhatasharnam/presentation/visits/new_visit.dart';
@@ -239,6 +240,33 @@ class _MyHomePageState extends State<MyHomePage> {
                         context,
                         MaterialPageRoute(builder: (context) => const ProfilePage()),
                       );
+                    },
+
+                  ),
+                  ListTile(
+                    leading: Icon(
+                      Icons.delete,
+                      color: AppTheme.iconColor,
+                      size: 28,
+                    ),
+                    title: Text(
+                      'Delete Profile',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text("your profile is deleted"),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      _performLogout();
+                      Navigator.pop(context);
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
+
                     },
 
                   ),
