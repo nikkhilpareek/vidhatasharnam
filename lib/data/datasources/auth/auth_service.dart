@@ -34,7 +34,7 @@ class UserData {
       email: data['email'] ?? '',
       role: (data['role'] ?? 'user').toString().toLowerCase(),
       isActive: data['active'] ?? false,
-      displayName: data['name'] ?? data['email']?.split('@')[0] ?? 'User',
+      displayName: data['username'] ?? data['name'] ?? data['email']?.split('@')[0] ?? 'User',
     );
   }
 }

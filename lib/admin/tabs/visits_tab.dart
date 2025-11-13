@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 class VisitsTab extends StatefulWidget {
   final String? initialFilter;
+
   const VisitsTab({super.key, this.initialFilter});
 
   @override
@@ -12,7 +13,11 @@ class VisitsTab extends StatefulWidget {
 class _VisitsTabState extends State<VisitsTab> {
   late String _visitStatusFilter;
   String _visitSearchQuery = '';
-  Map<String, int> _statusChipCounts = {'Pending': 0, 'Approved': 0, 'Rejected': 0};
+  Map<String, int> _statusChipCounts = {
+    'Pending': 0,
+    'Approved': 0,
+    'Rejected': 0,
+  };
 
   @override
   void initState() {
@@ -32,15 +37,26 @@ class _VisitsTabState extends State<VisitsTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Manage Visits', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.grey.shade800)),
+                Text(
+                  'Manage Visits',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
                 const SizedBox(height: 12),
                 TextField(
                   decoration: InputDecoration(
-                    hintText: 'Search by username, associate, customer, RERA, scheme... ',
+                    hintText:
+                        'Search by username, associate, customer, RERA, scheme... ',
                     prefixIcon: const Icon(Icons.search),
                     filled: true,
                     fillColor: Colors.grey.shade50,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 0,
+                      horizontal: 12,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(color: Colors.grey.shade300),
@@ -51,10 +67,15 @@ class _VisitsTabState extends State<VisitsTab> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.2),
+                      borderSide: BorderSide(
+                        color: Theme.of(context).colorScheme.primary,
+                        width: 1.2,
+                      ),
                     ),
                   ),
-                  onChanged: (v) => setState(() => _visitSearchQuery = v.trim().toLowerCase()),
+                  onChanged: (v) => setState(
+                    () => _visitSearchQuery = v.trim().toLowerCase(),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 SingleChildScrollView(
@@ -62,9 +83,9 @@ class _VisitsTabState extends State<VisitsTab> {
                   child: Row(
                     children: [
                       _buildStatusChip('All'),
-                      _buildStatusChip('Pending', color: Colors.orange),
-                      _buildStatusChip('Approved', color: Colors.green),
-                      _buildStatusChip('Rejected', color: Colors.red),
+                      _buildStatusChip('Pending'),
+                      _buildStatusChip('Approved'),
+                      _buildStatusChip('Rejected'),
                     ],
                   ),
                 ),
@@ -74,7 +95,9 @@ class _VisitsTabState extends State<VisitsTab> {
           const Divider(height: 0),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('users').snapshots(),
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .snapshots(),
               builder: (context, usersSnap) {
                 if (usersSnap.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -84,7 +107,8 @@ class _VisitsTabState extends State<VisitsTab> {
                 if (usersSnap.hasData) {
                   for (final d in usersSnap.data!.docs) {
                     final data = d.data() as Map<String, dynamic>;
-                    final raw = (data['username'] ?? data['email'] ?? '').toString();
+                    final raw = (data['username'] ?? data['email'] ?? '')
+                        .toString();
                     userNameMap[d.id] = raw.isNotEmpty ? raw : 'Unknown';
                   }
                 }
@@ -99,13 +123,21 @@ class _VisitsTabState extends State<VisitsTab> {
                       return const Center(child: CircularProgressIndicator());
                     }
                     if (!visitsSnap.hasData || visitsSnap.data!.docs.isEmpty) {
-                      return const Center(child: Text('No visits submitted yet.'));
+                      return const Center(
+                        child: Text('No visits submitted yet.'),
+                      );
                     }
 
                     final allDocs = visitsSnap.data!.docs;
-                    final countPending = allDocs.where((d) => (d['status'] ?? '') == 'Pending').length;
-                    final countApproved = allDocs.where((d) => (d['status'] ?? '') == 'Approved').length;
-                    final countRejected = allDocs.where((d) => (d['status'] ?? '') == 'Rejected').length;
+                    final countPending = allDocs
+                        .where((d) => (d['status'] ?? '') == 'Pending')
+                        .length;
+                    final countApproved = allDocs
+                        .where((d) => (d['status'] ?? '') == 'Approved')
+                        .length;
+                    final countRejected = allDocs
+                        .where((d) => (d['status'] ?? '') == 'Rejected')
+                        .length;
 
                     _statusChipCounts = {
                       'Pending': countPending,
@@ -115,21 +147,38 @@ class _VisitsTabState extends State<VisitsTab> {
 
                     Iterable<QueryDocumentSnapshot> filtered = allDocs;
                     if (_visitStatusFilter != 'All') {
-                      filtered = filtered.where((d) => (d['status'] ?? '') == _visitStatusFilter);
+                      filtered = filtered.where(
+                        (d) => (d['status'] ?? '') == _visitStatusFilter,
+                      );
                     }
 
                     if (_visitSearchQuery.isNotEmpty) {
                       filtered = filtered.where((d) {
                         final data = d.data() as Map<String, dynamic>;
                         final userId = data['userId'] ?? '';
-                        final username = (userNameMap[userId] ?? '').toLowerCase();
-                        final associate = (data['associateName'] ?? '').toString().toLowerCase();
-                        final customer = (data['customerName'] ?? '').toString().toLowerCase();
-                        final upperline = (data['upperlineName'] ?? '').toString().toLowerCase();
-                        final teamleader = (data['teamleaderName'] ?? '').toString().toLowerCase();
-                        final rera = (data['reraNumber'] ?? '').toString().toLowerCase();
-                        final schemeName = (data['schemeName'] ?? '').toString().toLowerCase();
-                        final location = (data['location'] ?? '').toString().toLowerCase();
+                        final username = (userNameMap[userId] ?? '')
+                            .toLowerCase();
+                        final associate = (data['associateName'] ?? '')
+                            .toString()
+                            .toLowerCase();
+                        final customer = (data['customerName'] ?? '')
+                            .toString()
+                            .toLowerCase();
+                        final upperline = (data['upperlineName'] ?? '')
+                            .toString()
+                            .toLowerCase();
+                        final teamleader = (data['teamleaderName'] ?? '')
+                            .toString()
+                            .toLowerCase();
+                        final rera = (data['reraNumber'] ?? '')
+                            .toString()
+                            .toLowerCase();
+                        final schemeName = (data['schemeName'] ?? '')
+                            .toString()
+                            .toLowerCase();
+                        final location = (data['location'] ?? '')
+                            .toString()
+                            .toLowerCase();
                         return username.contains(_visitSearchQuery) ||
                             associate.contains(_visitSearchQuery) ||
                             customer.contains(_visitSearchQuery) ||
@@ -144,7 +193,9 @@ class _VisitsTabState extends State<VisitsTab> {
                     final filteredList = filtered.toList();
                     if (filteredList.isEmpty) {
                       return Center(
-                        child: Text('No ${_visitStatusFilter == 'All' ? '' : _visitStatusFilter.toLowerCase()} visits match your search.'),
+                        child: Text(
+                          'No ${_visitStatusFilter == 'All' ? '' : _visitStatusFilter.toLowerCase()} visits match your search.',
+                        ),
                       );
                     }
 
@@ -159,6 +210,7 @@ class _VisitsTabState extends State<VisitsTab> {
                           visitId: doc.id,
                           visit: data,
                           userNameMap: userNameMap,
+                          onDeleteVisit: _deleteVisit,
                           onUpdateStatus: _updateVisitStatus,
                           onAssignScheme: _showAssignSchemeDialog,
                         );
@@ -174,31 +226,91 @@ class _VisitsTabState extends State<VisitsTab> {
     );
   }
 
-  Widget _buildStatusChip(String label, {Color? color}) {
+  Widget _buildStatusChip(String label) {
     final isSelected = _visitStatusFilter == label;
+
+    // Customize tick color based on status
+    Color chipColor;
+    switch (label) {
+      case 'Approved':
+        chipColor = Colors.green;
+        break;
+      case 'Pending':
+        chipColor = Colors.orange;
+        break;
+      case 'Rejected':
+        chipColor = Colors.red;
+        break;
+      default:
+        chipColor = Theme.of(context).colorScheme.primary;
+    }
+
+    // Count display
     String display = label;
     if (label != 'All' && _statusChipCounts.containsKey(label)) {
       display = '$label (${_statusChipCounts[label]})';
     }
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: ChoiceChip(
-        label: Text(display),
-        selected: isSelected,
-        selectedColor: (color ?? Theme.of(context).colorScheme.primary).withOpacity(0.15),
-        labelStyle: TextStyle(
-          color: isSelected ? (color ?? Theme.of(context).colorScheme.primary) : Colors.grey.shade700,
-          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+
+    return GestureDetector(
+      onTap: () => setState(() => _visitStatusFilter = label),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        margin: const EdgeInsets.only(right: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? chipColor.withOpacity(0.15) : Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isSelected ? chipColor : Colors.grey.shade300,
+            width: 1.2,
+          ),
         ),
-        side: BorderSide(color: isSelected ? (color ?? Theme.of(context).colorScheme.primary) : Colors.grey.shade300),
-        onSelected: (_) => setState(() => _visitStatusFilter = label),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Tick icon only when selected
+            if (isSelected) ...[
+              Icon(
+                Icons.check_circle,
+                color: chipColor,
+                size: 18,
+              ),
+              const SizedBox(width: 6),
+            ],
+
+            // Label text
+            Text(
+              display,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected ? chipColor : Colors.grey.shade700,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Future<void> _updateVisitStatus(String visitId, String newStatus) async {
-    await FirebaseFirestore.instance.collection('visits').doc(visitId).update({'status': newStatus});
+    await FirebaseFirestore.instance.collection('visits').doc(visitId).update({
+      'status': newStatus,
+    });
   }
+  Future<bool> _deleteVisit(String visitId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('visits')
+          .doc(visitId)
+          .delete();
+
+      return true;
+    } catch (e) {
+      debugPrint("❌ Failed to delete visit: $e");
+      return false;
+    }
+  }
+
 
   void _showAssignSchemeDialog(String visitId, String? existingScheme) {
     final schemeNameController = TextEditingController();
@@ -209,23 +321,32 @@ class _VisitsTabState extends State<VisitsTab> {
     showDialog(
       context: context,
       builder: (context) {
-        final future = FirebaseFirestore.instance.collection('visits').doc(visitId).get();
+        final future = FirebaseFirestore.instance
+            .collection('visits')
+            .doc(visitId)
+            .get();
 
         return FutureBuilder<DocumentSnapshot>(
           future: future,
           builder: (context, snap) {
             if (snap.hasData) {
               final data = snap.data!.data() as Map<String, dynamic>? ?? {};
-              
+
               // Pre-populate fields with existing data or defaults
               if (schemeNameController.text.isEmpty) {
-                schemeNameController.text = data['schemeName'] ?? data['scheme'] ?? existingScheme ?? '';
+                schemeNameController.text =
+                    data['schemeName'] ??
+                    data['scheme'] ??
+                    existingScheme ??
+                    '';
               }
               if (plotNumberController.text.isEmpty) {
-                plotNumberController.text = (data['plotNumber'] ?? '').toString();
+                plotNumberController.text = (data['plotNumber'] ?? '')
+                    .toString();
               }
               if (clientNameController.text.isEmpty) {
-                clientNameController.text = (data['clientName'] ?? '').toString();
+                clientNameController.text = (data['clientName'] ?? '')
+                    .toString();
               }
               if (gajSoldController.text.isEmpty) {
                 gajSoldController.text = (data['gajSold'] ?? '').toString();
@@ -282,7 +403,7 @@ class _VisitsTabState extends State<VisitsTab> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context), 
+                  onPressed: () => Navigator.pop(context),
                   child: const Text("Cancel"),
                 ),
                 ElevatedButton(
@@ -291,37 +412,47 @@ class _VisitsTabState extends State<VisitsTab> {
                     final plotNumber = plotNumberController.text.trim();
                     final clientName = clientNameController.text.trim();
                     final gajSoldText = gajSoldController.text.trim();
-                    
+
                     // Validation
                     if (schemeName.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Please enter scheme name")),
+                        const SnackBar(
+                          content: Text("Please enter scheme name"),
+                        ),
                       );
                       return;
                     }
-                    
+
                     // Convert gajSold to number, default to 0 if invalid
                     final gajSoldNumber = int.tryParse(gajSoldText) ?? 0;
-                    
+
                     try {
-                      await FirebaseFirestore.instance.collection('visits').doc(visitId).update({
-                        'schemeName': schemeName,
-                        'plotNumber': plotNumber,
-                        'clientName': clientName,
-                        'gajSold': gajSoldNumber,
-                        'scheme': schemeName, // Keep for backward compatibility
-                        'updatedAt': FieldValue.serverTimestamp(),
-                      });
-                      
+                      await FirebaseFirestore.instance
+                          .collection('visits')
+                          .doc(visitId)
+                          .update({
+                            'schemeName': schemeName,
+                            'plotNumber': plotNumber,
+                            'clientName': clientName,
+                            'gajSold': gajSoldNumber,
+                            'scheme':
+                                schemeName, // Keep for backward compatibility
+                            'updatedAt': FieldValue.serverTimestamp(),
+                          });
+
                       if (!context.mounted) return;
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Scheme details updated successfully")),
+                        const SnackBar(
+                          content: Text("Scheme details updated successfully"),
+                        ),
                       );
                     } catch (e) {
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Error updating scheme details: $e")),
+                        SnackBar(
+                          content: Text("Error updating scheme details: $e"),
+                        ),
                       );
                     }
                   },
@@ -341,6 +472,7 @@ class _CompactVisitCard extends StatelessWidget {
   final Map<String, dynamic> visit;
   final Map<String, String> userNameMap;
   final Future<void> Function(String visitId, String newStatus) onUpdateStatus;
+  final Future<void> Function(String visitId) onDeleteVisit;
   final void Function(String visitId, String? existingScheme) onAssignScheme;
 
   const _CompactVisitCard({
@@ -348,6 +480,7 @@ class _CompactVisitCard extends StatelessWidget {
     required this.visit,
     required this.userNameMap,
     required this.onUpdateStatus,
+    required this.onDeleteVisit,
     required this.onAssignScheme,
   });
 
@@ -365,7 +498,8 @@ class _CompactVisitCard extends StatelessWidget {
       try {
         final ts = visit['createdAt'] as Timestamp;
         final dt = ts.toDate();
-        formattedDate = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+        formattedDate =
+            '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
       } catch (_) {}
     }
 
@@ -388,7 +522,13 @@ class _CompactVisitCard extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.grey.shade200),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 2))],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         padding: const EdgeInsets.all(12),
         child: Row(
@@ -399,7 +539,11 @@ class _CompactVisitCard extends StatelessWidget {
               backgroundColor: statusColor.withOpacity(0.12),
               child: Text(
                 username.isNotEmpty ? username[0].toUpperCase() : '?',
-                style: TextStyle(color: statusColor, fontWeight: FontWeight.w600, fontSize: 14),
+                style: TextStyle(
+                  color: statusColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -414,12 +558,18 @@ class _CompactVisitCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           username,
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: statusColor.withOpacity(0.12),
                           borderRadius: BorderRadius.circular(12),
@@ -444,24 +594,38 @@ class _CompactVisitCard extends StatelessWidget {
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      Icon(Icons.place_outlined, size: 12, color: Colors.grey.shade600),
+                      Icon(
+                        Icons.place_outlined,
+                        size: 12,
+                        color: Colors.grey.shade600,
+                      ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
                           location,
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade600,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (photoUrl != null && photoUrl.isNotEmpty) ...[
                         const SizedBox(width: 8),
-                        Icon(Icons.photo_camera, size: 12, color: Colors.green.shade600),
+                        Icon(
+                          Icons.photo_camera,
+                          size: 12,
+                          color: Colors.green.shade600,
+                        ),
                       ],
                       if (formattedDate.isNotEmpty) ...[
                         const SizedBox(width: 8),
                         Text(
                           formattedDate,
-                          style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey.shade500,
+                          ),
                         ),
                       ],
                     ],
@@ -471,15 +635,30 @@ class _CompactVisitCard extends StatelessWidget {
                   Row(
                     children: [
                       if (photoUrl == null || photoUrl.isEmpty) ...[
-                        Icon(Icons.photo_camera_outlined, size: 12, color: Colors.orange.shade600),
+                        Icon(
+                          Icons.photo_camera_outlined,
+                          size: 12,
+                          color: Colors.orange.shade600,
+                        ),
                         const SizedBox(width: 2),
                       ],
-                      if (visit['scheme'] == null || visit['scheme'].toString().isEmpty) ...[
-                        Icon(Icons.lightbulb_outlined, size: 12, color: Colors.orange.shade600),
+                      if (visit['scheme'] == null ||
+                          visit['scheme'].toString().isEmpty) ...[
+                        Icon(
+                          Icons.lightbulb_outlined,
+                          size: 12,
+                          color: Colors.orange.shade600,
+                        ),
                         const SizedBox(width: 2),
                       ],
-                      if (visit['gajSold'] == null || visit['gajSold'].toString().isEmpty || visit['gajSold'] == 0) ...[
-                        Icon(Icons.landscape_outlined, size: 12, color: Colors.orange.shade600),
+                      if (visit['gajSold'] == null ||
+                          visit['gajSold'].toString().isEmpty ||
+                          visit['gajSold'] == 0) ...[
+                        Icon(
+                          Icons.landscape_outlined,
+                          size: 12,
+                          color: Colors.orange.shade600,
+                        ),
                         const SizedBox(width: 2),
                       ],
                     ],
@@ -505,6 +684,7 @@ class _CompactVisitCard extends StatelessWidget {
         visit: visit,
         userNameMap: userNameMap,
         onUpdateStatus: onUpdateStatus,
+        onDeleteVisit: onDeleteVisit,
         onAssignScheme: onAssignScheme,
       ),
     );
@@ -516,6 +696,7 @@ class _DetailedVisitView extends StatefulWidget {
   final Map<String, dynamic> visit;
   final Map<String, String> userNameMap;
   final Future<void> Function(String visitId, String newStatus) onUpdateStatus;
+  final Future<void> Function(String visitId) onDeleteVisit;
   final void Function(String visitId, String? existingScheme) onAssignScheme;
 
   const _DetailedVisitView({
@@ -523,6 +704,7 @@ class _DetailedVisitView extends StatefulWidget {
     required this.visit,
     required this.userNameMap,
     required this.onUpdateStatus,
+    required this.onDeleteVisit,
     required this.onAssignScheme,
   });
 
@@ -547,13 +729,13 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
         .doc(widget.visitId)
         .snapshots()
         .listen((doc) {
-      if (doc.exists && mounted) {
-        setState(() {
-          final newData = doc.data() as Map<String, dynamic>;
-          currentVisit.addAll(newData);
+          if (doc.exists && mounted) {
+            setState(() {
+              final newData = doc.data() as Map<String, dynamic>;
+              currentVisit.addAll(newData);
+            });
+          }
         });
-      }
-    });
   }
 
   @override
@@ -568,11 +750,13 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
     final photoUrl = currentVisit['photoUrl']?.toString();
 
     String formattedDate = '';
-    if (currentVisit['createdAt'] != null && currentVisit['createdAt'] is Timestamp) {
+    if (currentVisit['createdAt'] != null &&
+        currentVisit['createdAt'] is Timestamp) {
       try {
         final ts = currentVisit['createdAt'] as Timestamp;
         final dt = ts.toDate();
-        formattedDate = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}  ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+        formattedDate =
+            '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}  ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
       } catch (_) {}
     }
 
@@ -644,8 +828,14 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
                             radius: 24,
                             backgroundColor: statusColor.withOpacity(0.12),
                             child: Text(
-                              username.isNotEmpty ? username[0].toUpperCase() : '?',
-                              style: TextStyle(color: statusColor, fontWeight: FontWeight.w600, fontSize: 18),
+                              username.isNotEmpty
+                                  ? username[0].toUpperCase()
+                                  : '?',
+                              style: TextStyle(
+                                color: statusColor,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 18,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 16),
@@ -655,11 +845,17 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
                               children: [
                                 Text(
                                   'Visit by $username',
-                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: statusColor.withOpacity(0.12),
                                     borderRadius: BorderRadius.circular(20),
@@ -679,35 +875,84 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
                         ],
                       ),
                       const SizedBox(height: 24),
-                      
+
                       // Details
-                      _detailRow(Icons.person_outline, 'Associate Name', associate),
-                      _detailRow(Icons.person_outline, 'Customer Name', currentVisit['customerName'] ?? 'N/A'),
-                      _detailRow(Icons.person_outline, 'Upperline Name', currentVisit['upperlineName'] ?? 'N/A'),
-                      _detailRow(Icons.person_outline, 'Teamleader Name', currentVisit['teamleaderName'] ?? 'N/A'),
-                      _detailRow(Icons.numbers_outlined, 'RERA Number', currentVisit['reraNumber'] ?? 'N/A'),
-                      _detailRow(Icons.lightbulb_outline, 'Scheme Name', currentVisit['schemeName'] ?? 'N/A'),
+                      _detailRow(
+                        Icons.person_outline,
+                        'Associate Name',
+                        associate,
+                      ),
+                      _detailRow(
+                        Icons.person_outline,
+                        'Customer Name',
+                        currentVisit['customerName'] ?? 'N/A',
+                      ),
+                      _detailRow(
+                        Icons.person_outline,
+                        'Upperline Name',
+                        currentVisit['upperlineName'] ?? 'N/A',
+                      ),
+                      _detailRow(
+                        Icons.person_outline,
+                        'Teamleader Name',
+                        currentVisit['teamleaderName'] ?? 'N/A',
+                      ),
+                      _detailRow(
+                        Icons.numbers_outlined,
+                        'RERA Number',
+                        currentVisit['reraNumber'] ?? 'N/A',
+                      ),
+                      _detailRow(
+                        Icons.lightbulb_outline,
+                        'Scheme Name',
+                        currentVisit['schemeName'] ?? 'N/A',
+                      ),
                       _detailRow(Icons.place_outlined, 'Location', location),
-                      if (formattedDate.isNotEmpty) 
-                        _detailRow(Icons.access_time, 'Date & Time', formattedDate),
-                      
+                      if (formattedDate.isNotEmpty)
+                        _detailRow(
+                          Icons.access_time,
+                          'Date & Time',
+                          formattedDate,
+                        ),
+
                       // Scheme assignment details
-                      if (currentVisit['plotNumber'] != null && currentVisit['plotNumber'].toString().isNotEmpty)
-                        _detailRow(Icons.home_outlined, 'Plot Number', currentVisit['plotNumber'].toString()),
-                      if (currentVisit['clientName'] != null && currentVisit['clientName'].toString().isNotEmpty)
-                        _detailRow(Icons.person_outline, 'Client Name', currentVisit['clientName'].toString()),
+                      if (currentVisit['plotNumber'] != null &&
+                          currentVisit['plotNumber'].toString().isNotEmpty)
+                        _detailRow(
+                          Icons.home_outlined,
+                          'Plot Number',
+                          currentVisit['plotNumber'].toString(),
+                        ),
+                      if (currentVisit['clientName'] != null &&
+                          currentVisit['clientName'].toString().isNotEmpty)
+                        _detailRow(
+                          Icons.person_outline,
+                          'Client Name',
+                          currentVisit['clientName'].toString(),
+                        ),
                       if (gajSold != null && gajSold.toString().isNotEmpty)
-                        _detailRow(Icons.landscape_outlined, 'Gaj Sold', '${gajSold} Gaj'),
-                      
+                        _detailRow(
+                          Icons.landscape_outlined,
+                          'Gaj Sold',
+                          '${gajSold} Gaj',
+                        ),
+
                       if (scheme != null && scheme.toString().isNotEmpty)
-                        _detailRow(Icons.lightbulb_outline, 'Old Scheme', scheme.toString()),
+                        _detailRow(
+                          Icons.lightbulb_outline,
+                          'Old Scheme',
+                          scheme.toString(),
+                        ),
 
                       // Photo section
                       if (photoUrl != null && photoUrl.isNotEmpty) ...[
                         const SizedBox(height: 24),
                         const Text(
                           'Visit Photo',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         const SizedBox(height: 12),
                         GestureDetector(
@@ -719,20 +964,21 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
                               height: 250,
                               width: double.infinity,
                               fit: BoxFit.cover,
-                              loadingBuilder: (context, child, loadingProgress) {
-                                if (loadingProgress == null) return child;
-                                return Container(
-                                  height: 250,
-                                  width: double.infinity,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade100,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                );
-                              },
+                              loadingBuilder:
+                                  (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return Container(
+                                      height: 250,
+                                      width: double.infinity,
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade100,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Center(
+                                        child: CircularProgressIndicator(),
+                                      ),
+                                    );
+                                  },
                               errorBuilder: (context, error, stackTrace) {
                                 return Container(
                                   height: 250,
@@ -740,14 +986,18 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
                                   decoration: BoxDecoration(
                                     color: Colors.grey.shade100,
                                     borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: Colors.red.shade200),
+                                    border: Border.all(
+                                      color: Colors.red.shade200,
+                                    ),
                                   ),
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(Icons.broken_image, 
-                                           color: Colors.red.shade400, 
-                                           size: 48),
+                                      Icon(
+                                        Icons.broken_image,
+                                        color: Colors.red.shade400,
+                                        size: 48,
+                                      ),
                                       const SizedBox(height: 12),
                                       Text(
                                         'Failed to load image',
@@ -771,62 +1021,199 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
                       if (status == 'Pending') ...[
                         Row(
                           children: [
+                            // APPROVE BUTTON
                             Expanded(
                               child: ElevatedButton.icon(
                                 onPressed: () async {
-                                  await widget.onUpdateStatus(widget.visitId, 'Approved');
-                                  // Update local state and refresh UI
+                                  await widget.onUpdateStatus(
+                                    widget.visitId,
+                                    'Approved',
+                                  );
                                   setState(() {
                                     currentVisit['status'] = 'Approved';
                                   });
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.green,
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
                                 ),
-                                icon: const Icon(Icons.check, size: 20, color: Colors.white),
-                                label: const Text('Approve', style: TextStyle(fontSize: 16, color: Colors.white)),
+                                icon: const Icon(
+                                  Icons.check,
+                                  size: 20,
+                                  color: Colors.white,
+                                ),
+                                label: const Text(
+                                  'Approve',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
                               ),
                             ),
+
                             const SizedBox(width: 12),
+
+                            // REJECT BUTTON
                             Expanded(
                               child: ElevatedButton.icon(
                                 onPressed: () async {
-                                  await widget.onUpdateStatus(widget.visitId, 'Rejected');
-                                  Navigator.pop(context); // Close after rejection
+                                  await widget.onUpdateStatus(
+                                    widget.visitId,
+                                    'Rejected',
+                                  );
+                                  Navigator.pop(context);
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.red,
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
                                 ),
-                                icon: const Icon(Icons.close, size: 20, color: Colors.white),
-                                label: const Text('Reject', style: TextStyle(fontSize: 16, color: Colors.white)),
+                                icon: const Icon(
+                                  Icons.close,
+                                  size: 20,
+                                  color: Colors.white,
+                                ),
+                                label: const Text(
+                                  'Reject',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(width: 12),
+
+                            // DELETE BUTTON
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () async {
+                                  await widget.onDeleteVisit(widget.visitId);
+                                  Navigator.pop(context);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.black87,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                icon: const Icon(
+                                  Icons.delete_forever,
+                                  size: 20,
+                                  color: Colors.white,
+                                ),
+                                label: const Text(
+                                  'Delete',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ] else ...[
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              widget.onAssignScheme(widget.visitId, scheme?.toString());
-                              // Don't close the modal - let user see the updated data
-                            },
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              side: BorderSide(color: Colors.blue.shade400),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        Row(
+                          children: [
+                            // ------- Assign / Edit Scheme Button -------
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  widget.onAssignScheme(
+                                    widget.visitId,
+                                    scheme?.toString(),
+                                  );
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  side: BorderSide(color: Colors.blue.shade400),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                icon: const Icon(
+                                  Icons.lightbulb_outline,
+                                  size: 20,
+                                  color: Colors.blue,
+                                ),
+                                label: Text(
+                                  scheme == null || scheme.toString().isEmpty
+                                      ? 'Assign Scheme'
+                                      : 'Edit Scheme',
+                                  style: const TextStyle(color: Colors.blue, fontSize: 16),
+                                ),
+                              ),
                             ),
-                            icon: const Icon(Icons.lightbulb_outline, size: 20, color: Colors.blue),
-                            label: Text(
-                              scheme == null || scheme.toString().isEmpty ? 'Assign Scheme' : 'Edit Scheme',
-                              style: const TextStyle(color: Colors.blue, fontSize: 16),
+
+                            const SizedBox(width: 12),
+
+                            // ------------- DELETE BUTTON -------------
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () async {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: const Text("Delete Visit"),
+                                      content: const Text(
+                                        "Are you sure you want to delete this visit? This action cannot be undone.",
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(context, false),
+                                          child: const Text("Cancel"),
+                                        ),
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(context, true),
+                                          child: const Text(
+                                            "Delete",
+                                            style: TextStyle(color: Colors.red),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+
+                                  if (confirm == true) {
+                                    await widget.onDeleteVisit(widget.visitId);
+                                    Navigator.pop(context); // Close modal after delete
+                                  }
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  side: BorderSide(color: Colors.red.shade400),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  size: 20,
+                                  color: Colors.red,
+                                ),
+                                label: const Text(
+                                  'Delete',
+                                  style: TextStyle(color: Colors.red, fontSize: 16),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
+                          ],
+                        )
                       ],
                     ],
                   ),
@@ -910,16 +1297,11 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.broken_image, 
-                             color: Colors.white, 
-                             size: 60),
+                        Icon(Icons.broken_image, color: Colors.white, size: 60),
                         SizedBox(height: 16),
                         Text(
                           'Failed to load image',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                          ),
+                          style: TextStyle(color: Colors.white, fontSize: 16),
                         ),
                       ],
                     ),
@@ -933,4 +1315,3 @@ class _DetailedVisitViewState extends State<_DetailedVisitView> {
     );
   }
 }
-
