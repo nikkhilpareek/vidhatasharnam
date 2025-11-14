@@ -7,6 +7,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:vidhatasharnam/data/datasources/camera/camera_service.dart';
 
 import 'package:vidhatasharnam/core/logger/app_logger.dart';
+import 'package:vidhatasharnam/presentation/user/user_view_model.dart';
+import 'package:provider/provider.dart';
+import 'package:vidhatasharnam/core/exceptions/app_exception.dart';
 
 
 class NewVisitScreen extends StatefulWidget {
@@ -256,6 +259,60 @@ class _NewVisitScreenState extends State<NewVisitScreen> {
   Future<void> _submitForm() async {
   if (_formKey.currentState!.validate()) {
     try {
+      // Service-level check: Verify user is still active before creating visit
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) {
+        throw const UnauthorizedException('Not authenticated. Please log in again.');
+      }
+
+      // Check via UserViewModel first (real-time check)
+      final userViewModel = context.read<UserViewModel>();
+      if (!userViewModel.isActive) {
+        AppLogger.warning('[NewVisitScreen] Visit creation blocked: User is inactive');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Your account has been disabled by admin. Please contact support.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Double-check with Firestore for additional safety
+      try {
+        final snapshot = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+        if (!snapshot.exists) {
+          throw const UnauthorizedException('User account not found.');
+        }
+        
+        final userData = snapshot.data();
+        final active = userData?['active'] as bool? ?? false;
+        final statusField = userData?['status'] as String?;
+        
+        // Support both 'active' field and 'status' field
+        final isActiveFromDB = active || (statusField?.toLowerCase() == 'active');
+        
+        if (!isActiveFromDB) {
+          AppLogger.warning('[NewVisitScreen] Visit creation blocked: User inactive in Firestore');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Your account has been disabled by admin. Please contact support.'),
+                backgroundColor: Colors.red,
+                duration: Duration(seconds: 4),
+              ),
+            );
+          }
+          return;
+        }
+      } catch (e) {
+        // If Firestore check fails but UserProvider says active, log and continue
+        AppLogger.warning('[NewVisitScreen] Firestore check failed, but UserProvider says active: $e');
+      }
+
       // Prepare datetime from date & time controllers
       final now = DateTime.now();
       final selectedDateTime = DateTime(
@@ -271,6 +328,7 @@ class _NewVisitScreenState extends State<NewVisitScreen> {
       });
 
       // Save visit to Firestore
+      AppLogger.info('[NewVisitScreen] Creating visit for user: $uid');
       await FirebaseFirestore.instance.collection('visits').add({
         'userId': FirebaseAuth.instance.currentUser!.uid,
         'associateName': _associateNameController.text.trim(),

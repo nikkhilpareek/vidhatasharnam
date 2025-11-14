@@ -298,10 +298,20 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  /// Callback to start UserProvider listener after successful authentication
+  /// This is called from UI after AuthService signIn completes
+  void onUserAuthenticated() {
+    // UserProvider.start() will be called from UI after this
+    debugPrint('[AuthService] User authenticated, ready for UserProvider to start');
+  }
+
   Future<void> signOut() async {
     try {
+      // Note: UserProvider.stop() should be called from UI context
+      // as it requires Provider context. AuthWrapper handles this.
       await FirebaseAuth.instance.signOut();
       await _clearSession();
+      debugPrint('[AuthService] Sign out completed');
     } catch (e, stackTrace) {
       AppLogger.error(
         'Error signing out',

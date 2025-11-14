@@ -8,6 +8,8 @@ import 'package:vidhatasharnam/core/theme/app_theme.dart';
 import 'package:vidhatasharnam/data/datasources/auth/auth_service.dart';
 import 'package:vidhatasharnam/data/datasources/community/community_notification_service.dart';
 import 'package:vidhatasharnam/domain/repositories/local_storage.dart';
+import 'package:vidhatasharnam/presentation/user/user_view_model.dart';
+import 'package:provider/provider.dart';
 import 'package:vidhatasharnam/presentation/about/about_us_screen.dart';
 import 'package:vidhatasharnam/presentation/auth/login/login_screen.dart';
 import 'package:vidhatasharnam/presentation/community/community_screen.dart';
@@ -28,38 +30,43 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-
-  String? userName;
-  String? status;
   final LocalStorageService _localStorage = LocalStorageService();
+  bool _hasShownDeactivatedSnackBar = false;
 
   @override
   void initState() {
     super.initState();
-    _loadUserData();
 
     // Initialize background processes after the screen is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeBackgroundProcesses();
+      
+      // Ensure UserViewModel listener is started
+      final userViewModel = context.read<UserViewModel>();
+      if (!userViewModel.isListening) {
+        userViewModel.startUserListener().catchError((e) {
+          debugPrint('[MyHomePage] Warning: Failed to start UserViewModel: $e');
+        });
+      }
     });
   }
 
-  Future<void> _loadUserData() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      if (doc.exists) {
-        setState(() {
-          userName =
-              doc['username']; // 👈 make sure your Firestore has a "name" field
-          status =
-              doc['status']; // 👈 make sure your Firestore has a "name" field
-        });
+  String _getStatus(UserViewModel userViewModel) {
+    // Use UserViewModel for real-time status
+    if (!userViewModel.isActive) {
+      return 'Deactivated';
+    }
+    
+    // Check userData from ViewModel for status field
+    final userData = userViewModel.userData;
+    if (userData != null) {
+      final statusField = userData['status'] as String?;
+      if (statusField != null) {
+        return statusField;
       }
     }
+    
+    return 'Active'; // Default
   }
 
   /// Initialize background processes like device registration and notification service
@@ -134,48 +141,45 @@ class _MyHomePageState extends State<MyHomePage> {
   // Simple notification state
   int _notificationCount = 12; // Hardcoded for testing - matches your image
 
-  void _updateNotificationCount() {
-    // You can call this method to update the count
-    setState(() {
-      _notificationCount = _notificationCount > 0 ? 0 : 12;
-    });
-  }
-
   Widget _buildCardButton({
     required String title,
     required IconData icon,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
+    bool isEnabled = true,
   }) {
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              spreadRadius: 2,
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 40, color: AppTheme.iconColor),
-            SizedBox(height: 12),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade800,
+      onTap: isEnabled ? onTap : null,
+      child: Opacity(
+        opacity: isEnabled ? 1.0 : 0.5,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                spreadRadius: 2,
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
-            ),
-          ],
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 40, color: AppTheme.iconColor),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isEnabled ? Colors.grey.shade800 : Colors.grey.shade400,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -569,201 +573,260 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      key: _scaffoldKey,
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              widget.title,
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 24,
-                color: Colors.black, // Black for main heading
-              ),
-            ),
-            Text(
-              "Turning land into legacy",
-              style: TextStyle(
-                fontSize: 12,
-                fontStyle: FontStyle.italic,
-                color: Colors.black54,
-                // Lighter black for subheading
-                letterSpacing: 0.3,
-                fontWeight: FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-        actions: <Widget>[
-          IconButton(
-            onPressed: () {
-              _scaffoldKey.currentState?.openEndDrawer();
-            },
-            icon: Icon(Icons.menu),
-          ),
-          SizedBox(width: 16),
-        ],
-      ),
-      endDrawer: _buildDrawer(),
-      floatingActionButton: FloatingActionButton.large(
-        onPressed: () {
-          if (status == "Active") {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => NewVisitScreen(),
-              ),
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text("Your Profile is Disable by Admin!! Please Contact"),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        },
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
-        shape: CircleBorder(),
-        child: Icon(Icons.add, size: 35),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.start,
+    // Use Consumer to reactively observe UserViewModel changes
+    return Consumer<UserViewModel>(
+      builder: (context, userViewModel, _) {
+        // Show snackbar when user is deactivated (only once per state change)
+        if (!userViewModel.isActive && !_hasShownDeactivatedSnackBar && mounted) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _hasShownDeactivatedSnackBar = true;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Your account has been deactivated by admin. Contact support.'),
+                  backgroundColor: Colors.red.shade700,
+                  duration: const Duration(seconds: 5),
+                ),
+              );
+            }
+          });
+        }
+        
+        // Reset flag when user becomes active again
+        if (userViewModel.isActive && _hasShownDeactivatedSnackBar) {
+          _hasShownDeactivatedSnackBar = false;
+        }
+
+        // Determine background color based on active status
+        final backgroundColor = userViewModel.isActive 
+            ? Colors.grey.shade50  // Normal background
+            : Colors.red.shade50.withOpacity(0.3);  // Red tint when deactivated
+
+        return Scaffold(
+          key: _scaffoldKey,
+          backgroundColor: backgroundColor,
+          appBar: AppBar(
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // USERNAME TEXT
                 Text(
-                  "Welcome back, $userName!",
+                  widget.title,
                   style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 24,
+                    color: Colors.black, // Black for main heading
                   ),
                 ),
-
-                const SizedBox(width: 12),
-
-                // STATUS BADGE
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: status == "Active"
-                        ? Colors.green.withOpacity(0.15)
-                        : Colors.red.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: status == "Active"
-                          ? Colors.green.shade700
-                          : Colors.red.shade700,
-                    ),
-                  ),
-                  child: Text(
-                    status!,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: status == "Active"
-                          ? Colors.green.shade700
-                          : Colors.red.shade700,
-                    ),
+                const Text(
+                  "Turning land into legacy",
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.black54,
+                    // Lighter black for subheading
+                    letterSpacing: 0.3,
+                    fontWeight: FontWeight.normal,
                   ),
                 ),
               ],
             ),
-            Text(
-              "Welcome to Vidhatasharnam – your personal visit tracker",
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.primary,
-                letterSpacing: 1.2,
+            actions: <Widget>[
+              IconButton(
+                onPressed: () {
+                  _scaffoldKey.currentState?.openEndDrawer();
+                },
+                icon: const Icon(Icons.menu),
               ),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 20),
-            Expanded(
-              child: GridView.count(
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                children: [
-                  _buildCardButton(
-                    title: "Create New Visit",
-                    icon: Icons.add_circle_outline_rounded,
-                    onTap: () {
-                      if (status == "Active") {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => NewVisitScreen(),
+              const SizedBox(width: 16),
+            ],
+          ),
+          endDrawer: _buildDrawer(),
+          // Floating Action Button - hidden when user is inactive
+          floatingActionButton: userViewModel.isActive
+              ? FloatingActionButton.large(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const NewVisitScreen(),
+                      ),
+                    );
+                  },
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.white,
+                  shape: const CircleBorder(),
+                  child: const Icon(Icons.add, size: 35),
+                )
+              : null, // Hide FAB when inactive
+          floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+          body: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Deactivated warning banner
+                if (!userViewModel.isActive)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.shade700, width: 1),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.warning, color: Colors.red.shade700),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Your account is currently deactivated. Please contact admin.',
+                            style: TextStyle(
+                              color: Colors.red.shade700,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
                           ),
-                        );
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text("Your Profile is Disable by Admin!! Please Contact"),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                  _buildCardButton(
-                    title: "Pending Visits",
-                    icon: Icons.pending_actions_outlined,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => PendingVisitsScreen(),
                         ),
-                      );
-                    },
+                      ],
+                    ),
                   ),
-                  _buildCardButton(
-                    title: "Total Visits",
-                    icon: Icons.analytics_outlined,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => TotalVisitsScreen(),
+
+                // Welcome row with username and status badge
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    // USERNAME TEXT
+                    Text(
+                      "Welcome back, ${userViewModel.userName ?? 'User'}!",
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+
+                    const SizedBox(width: 12),
+
+                    // STATUS BADGE - Updates in real-time via UserViewModel
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: userViewModel.isActive
+                            ? Colors.green.withOpacity(0.15)
+                            : Colors.red.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: userViewModel.isActive
+                              ? Colors.green.shade700
+                              : Colors.red.shade700,
                         ),
-                      );
-                    },
-                  ),
-                  _buildCardButton(
-                    title: "Total Gaj Sold",
-                    icon: Icons.landscape_outlined,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => TotalGajSoldScreen(),
+                      ),
+                      child: Text(
+                        _getStatus(userViewModel),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: userViewModel.isActive
+                              ? Colors.green.shade700
+                              : Colors.red.shade700,
                         ),
-                      );
-                    },
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  "Welcome to Vidhatasharnam – your personal visit tracker",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.primary,
+                    letterSpacing: 1.2,
                   ),
-                ],
-              ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                Expanded(
+                  child: GridView.count(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    children: [
+                      // Create New Visit button - disabled when user is inactive
+                      _buildCardButton(
+                        title: "Create New Visit",
+                        icon: Icons.add_circle_outline_rounded,
+                        onTap: userViewModel.isActive
+                            ? () {
+                          if (userViewModel.isActive) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => NewVisitScreen(),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text("Your Profile is Disable by Admin!! Please Contact"),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                              }
+                            : null, // Disabled when inactive
+                        isEnabled: userViewModel.isActive,
+                      ),
+                      // Other buttons use default isEnabled = true
+                      _buildCardButton(
+                        title: "Pending Visits",
+                        icon: Icons.pending_actions_outlined,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const PendingVisitsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildCardButton(
+                        title: "Total Visits",
+                        icon: Icons.analytics_outlined,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const TotalVisitsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildCardButton(
+                        title: "Total Gaj Sold",
+                        icon: Icons.landscape_outlined,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const TotalGajSoldScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: BottomAppBar(
-        shape: CircularNotchedRectangle(),
+          ),
+          bottomNavigationBar: BottomAppBar(
+            shape: const CircularNotchedRectangle(),
         notchMargin: 10,
         height: 100,
         color: Colors.white,
@@ -858,9 +921,11 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
               ],
             ),
-          ],
+            ],
+          ),
         ),
-      ),
+        );
+      },
     );
   }
 }

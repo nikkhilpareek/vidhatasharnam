@@ -17,6 +17,7 @@ import 'package:vidhatasharnam/data/repositories/auth_repository_impl.dart';
 import 'package:vidhatasharnam/domain/repositories/auth_repository.dart';
 import 'package:vidhatasharnam/presentation/auth/login/login_view_model.dart';
 import 'package:vidhatasharnam/presentation/auth/register/register_view_model.dart';
+import 'package:vidhatasharnam/presentation/user/user_view_model.dart';
 import 'package:vidhatasharnam/config/supabase_config.dart';
 
 // Global variable to track initialization state
@@ -245,6 +246,9 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider<AuthService>.value(value: AuthService.instance),
+        ChangeNotifierProvider<UserViewModel>(
+          create: (_) => UserViewModel(),
+        ),
         Provider<ExceptionHandler>(create: (_) => const ExceptionHandler()),
         ProxyProvider<AuthService, AuthRepository>(
           update: (_, authService, __) =>
