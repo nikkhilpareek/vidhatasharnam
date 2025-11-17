@@ -696,16 +696,18 @@ class _MyHomePageState extends State<MyHomePage> {
 
                 // Welcome row with username and status badge
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     // USERNAME TEXT
                     Text(
                       "Welcome back, ${userViewModel.userName ?? 'User'}!",
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
+                      style:  TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.primary,
+                        letterSpacing: 1.2,
                       ),
+                      textAlign: TextAlign.center,
                     ),
 
                     const SizedBox(width: 12),
@@ -740,16 +742,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     ),
                   ],
                 ),
-                Text(
-                  "Welcome to Vidhatasharnam – your personal visit tracker",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
-                    letterSpacing: 1.2,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
+
                 const SizedBox(height: 20),
                 Expanded(
                   child: GridView.count(
