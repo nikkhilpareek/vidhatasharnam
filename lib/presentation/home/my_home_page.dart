@@ -1,26 +1,27 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-
+import 'package:vidhatasharnam/core/config/app_constants.dart';
 import 'package:vidhatasharnam/core/logger/app_logger.dart';
 import 'package:vidhatasharnam/core/theme/app_theme.dart';
-import 'package:vidhatasharnam/core/config/app_constants.dart';
-import 'package:vidhatasharnam/domain/repositories/local_storage.dart';
 import 'package:vidhatasharnam/data/datasources/auth/auth_service.dart';
 import 'package:vidhatasharnam/data/datasources/community/community_notification_service.dart';
+import 'package:vidhatasharnam/domain/repositories/local_storage.dart';
+import 'package:vidhatasharnam/presentation/user/user_view_model.dart';
+import 'package:vidhatasharnam/presentation/home/home_view_model.dart';
+import 'package:provider/provider.dart';
+import 'package:vidhatasharnam/presentation/about/about_us_screen.dart';
 import 'package:vidhatasharnam/presentation/auth/login/login_screen.dart';
 import 'package:vidhatasharnam/presentation/community/community_screen.dart';
 import 'package:vidhatasharnam/presentation/profile/profile_page.dart';
-import 'package:vidhatasharnam/presentation/about/about_us_screen.dart';
 import 'package:vidhatasharnam/presentation/visits/new_visit.dart';
 import 'package:vidhatasharnam/presentation/visits/pending_visit.dart';
 import 'package:vidhatasharnam/presentation/visits/total_gaj_sold.dart';
 import 'package:vidhatasharnam/presentation/visits/total_visits.dart';
 
-
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
+
   final String title;
 
   @override
@@ -29,31 +30,49 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-
-  String? userName;
   final LocalStorageService _localStorage = LocalStorageService();
+  bool _hasShownDeactivatedSnackBar = false;
 
   @override
   void initState() {
     super.initState();
-    _loadUserData();
-    
+
     // Initialize background processes after the screen is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeBackgroundProcesses();
+
+      final homeViewModel = context.read<HomeViewModel>();
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        homeViewModel.startCommunityNotificationListener(currentUser.uid);
+      }
+      
+      // Ensure UserViewModel listener is started
+      final userViewModel = context.read<UserViewModel>();
+      if (!userViewModel.isListening) {
+        userViewModel.startUserListener().catchError((e) {
+          debugPrint('[MyHomePage] Warning: Failed to start UserViewModel: $e');
+        });
+      }
     });
   }
 
-  Future<void> _loadUserData() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      if (doc.exists) {
-        setState(() {
-          userName = doc['username']; // 👈 make sure your Firestore has a "name" field
-        });
+  String _getStatus(UserViewModel userViewModel) {
+    // Use UserViewModel for real-time status
+    if (!userViewModel.isActive) {
+      return 'Deactivated';
+    }
+    
+    // Check userData from ViewModel for status field
+    final userData = userViewModel.userData;
+    if (userData != null) {
+      final statusField = userData['status'] as String?;
+      if (statusField != null) {
+        return statusField;
       }
     }
+    
+    return 'Active'; // Default
   }
 
   /// Initialize background processes like device registration and notification service
@@ -61,7 +80,7 @@ class _MyHomePageState extends State<MyHomePage> {
     try {
       // Initialize Community Notification Service
       await CommunityNotificationService.instance.initialize();
-      
+
       // Register device token if not already registered
       await _registerDeviceIfNeeded();
     } catch (e, stackTrace) {
@@ -76,9 +95,12 @@ class _MyHomePageState extends State<MyHomePage> {
   /// Register device token if not already registered
   Future<void> _registerDeviceIfNeeded() async {
     try {
-      final isDeviceRegistered = _localStorage.getBool(AppConstants.prefDeviceRegistered) ?? false;
-      final storedToken = _localStorage.getString(AppConstants.prefRegisteredDeviceToken);
-      
+      final isDeviceRegistered =
+          _localStorage.getBool(AppConstants.prefDeviceRegistered) ?? false;
+      final storedToken = _localStorage.getString(
+        AppConstants.prefRegisteredDeviceToken,
+      );
+
       // Check if device is already registered
       if (isDeviceRegistered && storedToken != null) {
         AppLogger.info('Device already registered with token: $storedToken');
@@ -95,19 +117,23 @@ class _MyHomePageState extends State<MyHomePage> {
       // For now, this is a placeholder that you can integrate with firebase_messaging
       // Example:
       // final fcmToken = await FirebaseMessaging.instance.getToken();
-      
+
       // Placeholder: Generate a mock token for demonstration
       // In production, replace this with actual FCM token from FirebaseMessaging
-      final deviceToken = 'mock_device_token_${DateTime.now().millisecondsSinceEpoch}';
-      
+      final deviceToken =
+          'mock_device_token_${DateTime.now().millisecondsSinceEpoch}';
+
       // Save registration status
       await _localStorage.saveBool(AppConstants.prefDeviceRegistered, true);
-      await _localStorage.saveString(AppConstants.prefRegisteredDeviceToken, deviceToken);
-      
+      await _localStorage.saveString(
+        AppConstants.prefRegisteredDeviceToken,
+        deviceToken,
+      );
+
       // TODO: Send token to your backend/API
       // Example API call:
       // await HomeRepository.registerDevice(userId: user.uid, token: deviceToken);
-      
+
       AppLogger.info('Device registered successfully with token: $deviceToken');
     } catch (e, stackTrace) {
       AppLogger.error(
@@ -118,55 +144,46 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  // Simple notification state
-  int _notificationCount = 12; // Hardcoded for testing - matches your image
-
-  void _updateNotificationCount() {
-    // You can call this method to update the count
-    setState(() {
-      _notificationCount = _notificationCount > 0 ? 0 : 12;
-    });
-  }
 
   Widget _buildCardButton({
     required String title,
     required IconData icon,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
+    bool isEnabled = true,
   }) {
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              spreadRadius: 2,
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 40,
-              color: AppTheme.iconColor,
-            ),
-            SizedBox(height: 12),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade800,
+      onTap: isEnabled ? onTap : null,
+      child: Opacity(
+        opacity: isEnabled ? 1.0 : 0.5,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                spreadRadius: 2,
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
-            ),
-          ],
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 40, color: AppTheme.iconColor),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isEnabled ? Colors.grey.shade800 : Colors.grey.shade400,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -180,27 +197,25 @@ class _MyHomePageState extends State<MyHomePage> {
           Container(
             height: 200,
             width: double.infinity,
-            decoration: BoxDecoration(
-              color: Color(0xFFFFF4E8),
-            ),
+            decoration: BoxDecoration(color: Color(0xFFFFF4E8)),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(height: 20,),
+              children: [
+                SizedBox(height: 20),
                 Image.asset(
                   'assets/images/logo.png',
                   width: 170,
                   height: 100,
                   fit: BoxFit.contain,
                   errorBuilder: (context, error, stackTrace) {
-                  return Icon(
-                    Icons.business,
-                    size: 50,
-                    color: AppTheme.iconColor,
-                  );
+                    return Icon(
+                      Icons.business,
+                      size: 50,
+                      color: AppTheme.iconColor,
+                    );
                   },
                 ),
-                SizedBox(height: 8,),
+                SizedBox(height: 4),
                 Text(
                   'Turning land into legacy',
                   style: TextStyle(
@@ -211,11 +226,11 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                   textAlign: TextAlign.center,
                 ),
-                SizedBox(height: 10,),
+                SizedBox(height: 10),
               ],
             ),
           ),
-          
+
           // Drawer Items with padding
           Expanded(
             child: Padding(
@@ -239,10 +254,11 @@ class _MyHomePageState extends State<MyHomePage> {
                       Navigator.pop(context);
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const ProfilePage()),
+                        MaterialPageRoute(
+                          builder: (context) => const ProfilePage(),
+                        ),
                       );
                     },
-
                   ),
                   ListTile(
                     leading: Icon(
@@ -266,14 +282,17 @@ class _MyHomePageState extends State<MyHomePage> {
                       );
                       _performLogout();
                       Navigator.pop(context);
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
-
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LoginScreen(),
+                        ),
+                      );
                     },
-
                   ),
 
                   SizedBox(height: 10),
-                  
+
                   ExpansionTile(
                     leading: Icon(
                       Icons.business_outlined,
@@ -304,12 +323,19 @@ class _MyHomePageState extends State<MyHomePage> {
                         onTap: () async {
                           Navigator.pop(context);
                           try {
-                            final url = Uri.parse('https://vidhatasharanam.com');
-                            await launchUrl(url, mode: LaunchMode.externalApplication);
+                            final url = Uri.parse(
+                              'https://vidhatasharanam.com',
+                            );
+                            await launchUrl(
+                              url,
+                              mode: LaunchMode.externalApplication,
+                            );
                           } catch (e) {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Could not open website: $e')),
+                                SnackBar(
+                                  content: Text('Could not open website: $e'),
+                                ),
                               );
                             }
                           }
@@ -318,7 +344,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     ],
                   ),
                   SizedBox(height: 10),
-                  
+
                   // Contact Us Section
                   ExpansionTile(
                     leading: Icon(
@@ -350,12 +376,16 @@ class _MyHomePageState extends State<MyHomePage> {
                         onTap: () async {
                           Navigator.pop(context);
                           try {
-                            final url = Uri.parse('mailto:vidhatasharanam@gmail.com');
+                            final url = Uri.parse(
+                              'mailto:vidhatasharanam@gmail.com',
+                            );
                             await launchUrl(url);
                           } catch (e) {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Could not open email app: $e')),
+                                SnackBar(
+                                  content: Text('Could not open email app: $e'),
+                                ),
                               );
                             }
                           }
@@ -382,7 +412,9 @@ class _MyHomePageState extends State<MyHomePage> {
                           } catch (e) {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Could not open phone app: $e')),
+                                SnackBar(
+                                  content: Text('Could not open phone app: $e'),
+                                ),
                               );
                             }
                           }
@@ -418,7 +450,7 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
             ),
           ),
-          
+
           // Logout Button at Bottom
           Container(
             padding: EdgeInsets.all(20),
@@ -439,10 +471,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
                 child: Text(
                   'LOG OUT',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ),
             ),
@@ -467,10 +496,7 @@ class _MyHomePageState extends State<MyHomePage> {
               },
             ),
             TextButton(
-              child: Text(
-                'Logout',
-                style: TextStyle(color: Colors.red),
-              ),
+              child: Text('Logout', style: TextStyle(color: Colors.red)),
               onPressed: () {
                 Navigator.of(context).pop(); // Close dialog first
                 _performLogout();
@@ -485,7 +511,11 @@ class _MyHomePageState extends State<MyHomePage> {
   void _performLogout() async {
     // Show loading indicator briefly
     if (!mounted) return;
-    
+
+    final homeViewModel = context.read<HomeViewModel>();
+    homeViewModel.stopCommunityNotificationListener();
+    homeViewModel.clearNotifications();
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -506,10 +536,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 SizedBox(height: 16),
                 Text(
                   'Logging out...',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -521,24 +548,24 @@ class _MyHomePageState extends State<MyHomePage> {
     try {
       // Use AuthService to sign out (this will clear LocalStorageService)
       await AuthService.instance.signOut();
-      
+
       // Close loading dialog
       if (mounted && Navigator.canPop(context)) {
         Navigator.of(context).pop();
       }
-      
+
       // Navigate to login screen and prevent back navigation
       if (mounted) {
-        Navigator.of(context).pushReplacementNamed(
-          AppConstants.navigateToLoginScreen,
-        );
+        Navigator.of(
+          context,
+        ).pushReplacementNamed(AppConstants.navigateToLoginScreen);
       }
     } catch (e) {
       // Close loading dialog
       if (mounted && Navigator.canPop(context)) {
         Navigator.of(context).pop();
       }
-      
+
       // Show error message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -554,137 +581,253 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      key: _scaffoldKey,
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              widget.title,
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 24,
-                color: Colors.black, // Black for main heading
-              ),
+    // Use Consumer to reactively observe UserViewModel and HomeViewModel changes
+    return Consumer2<UserViewModel, HomeViewModel>(
+      builder: (context, userViewModel, homeViewModel, _) {
+        // Show snackbar when user is deactivated (only once per state change)
+        if (!userViewModel.isActive && !_hasShownDeactivatedSnackBar && mounted) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _hasShownDeactivatedSnackBar = true;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Your account has been deactivated by admin. Contact support.'),
+                  backgroundColor: Colors.red.shade700,
+                  duration: const Duration(seconds: 5),
+                ),
+              );
+            }
+          });
+        }
+        
+        // Reset flag when user becomes active again
+        if (userViewModel.isActive && _hasShownDeactivatedSnackBar) {
+          _hasShownDeactivatedSnackBar = false;
+        }
+
+        // Determine background color based on active status
+        final backgroundColor = userViewModel.isActive 
+            ? Colors.grey.shade50  // Normal background
+            : Colors.red.shade50.withOpacity(0.3);  // Red tint when deactivated
+
+        return Scaffold(
+          key: _scaffoldKey,
+          backgroundColor: backgroundColor,
+          appBar: AppBar(
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  widget.title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 24,
+                    color: Colors.black, // Black for main heading
+                  ),
+                ),
+                const Text(
+                  "Turning land into legacy",
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.black54,
+                    // Lighter black for subheading
+                    letterSpacing: 0.3,
+                    fontWeight: FontWeight.normal,
+                  ),
+                ),
+              ],
             ),
-            Text(
-              "Turning land into legacy",
-              style: TextStyle(
-                fontSize: 12,
-                fontStyle: FontStyle.italic,
-                color: Colors.black54, // Lighter black for subheading
-                letterSpacing: 0.3,
-                fontWeight: FontWeight.normal,
+            actions: <Widget>[
+              IconButton(
+                onPressed: () {
+                  _scaffoldKey.currentState?.openEndDrawer();
+                },
+                icon: const Icon(Icons.menu),
               ),
-            ),
-          ],
-        ),
-        actions: <Widget>[
-          IconButton(
-            onPressed: () {
-              _scaffoldKey.currentState?.openEndDrawer();
-            }, 
-            icon: Icon(Icons.menu)
+              const SizedBox(width: 16),
+            ],
           ),
-          SizedBox(width: 16),
-        ],
-      ),
-      endDrawer: _buildDrawer(),
-      floatingActionButton: FloatingActionButton.large(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => NewVisitScreen(),
+          endDrawer: _buildDrawer(),
+          // Floating Action Button - hidden when user is inactive
+          floatingActionButton: userViewModel.isActive
+              ? FloatingActionButton.large(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const NewVisitScreen(),
+                      ),
+                    );
+                  },
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.white,
+                  shape: const CircleBorder(),
+                  child: const Icon(Icons.add, size: 35),
+                )
+              : null, // Hide FAB when inactive
+          floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+          body: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Deactivated warning banner
+                if (!userViewModel.isActive)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.shade700, width: 1),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.warning, color: Colors.red.shade700),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Your account is currently deactivated. Please contact admin.',
+                            style: TextStyle(
+                              color: Colors.red.shade700,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // Welcome row with username and status badge
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // USERNAME TEXT
+                    Text(
+                      "Welcome back, ${userViewModel.userName ?? 'User'}!",
+                      style:  TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.primary,
+                        letterSpacing: 1.2,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+
+                    const SizedBox(width: 12),
+
+                    // STATUS BADGE - Updates in real-time via UserViewModel
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: userViewModel.isActive
+                            ? Colors.green.withOpacity(0.15)
+                            : Colors.red.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: userViewModel.isActive
+                              ? Colors.green.shade700
+                              : Colors.red.shade700,
+                        ),
+                      ),
+                      child: Text(
+                        _getStatus(userViewModel),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: userViewModel.isActive
+                              ? Colors.green.shade700
+                              : Colors.red.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+                Expanded(
+                  child: GridView.count(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    children: [
+                      // Create New Visit button - disabled when user is inactive
+                      _buildCardButton(
+                        title: "Create New Visit",
+                        icon: Icons.add_circle_outline_rounded,
+                        onTap: userViewModel.isActive
+                            ? () {
+                          if (userViewModel.isActive) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => NewVisitScreen(),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text("Your Profile is Disable by Admin!! Please Contact"),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                              }
+                            : null, // Disabled when inactive
+                        isEnabled: userViewModel.isActive,
+                      ),
+                      // Other buttons use default isEnabled = true
+                      _buildCardButton(
+                        title: "Pending Visits",
+                        icon: Icons.pending_actions_outlined,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const PendingVisitsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildCardButton(
+                        title: "Total Visits",
+                        icon: Icons.analytics_outlined,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const TotalVisitsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildCardButton(
+                        title: "Total Gaj Sold",
+                        icon: Icons.landscape_outlined,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const TotalGajSoldScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          );
-        },
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
-        shape: CircleBorder(),
-        child: Icon(Icons.add, size: 35),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Welcome to Vidhatasharnam – your personal visit tracker",
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.primary,
-                letterSpacing: 1.2,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 20),
-            Expanded(
-              child: GridView.count(
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                children: [
-                  _buildCardButton(
-                    title: "Create New Visit",
-                    icon: Icons.add_circle_outline_rounded,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => NewVisitScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildCardButton(
-                    title: "Pending Visits",
-                    icon: Icons.pending_actions_outlined,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => PendingVisitsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildCardButton(
-                    title: "Total Visits",
-                    icon: Icons.analytics_outlined,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => TotalVisitsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildCardButton(
-                    title: "Total Gaj Sold",
-                    icon: Icons.landscape_outlined,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => TotalGajSoldScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: BottomAppBar(
-        shape: CircularNotchedRectangle(),
+          ),
+          bottomNavigationBar: BottomAppBar(
+            shape: const CircularNotchedRectangle(),
         notchMargin: 10,
         height: 100,
         color: Colors.white,
@@ -704,9 +847,9 @@ class _MyHomePageState extends State<MyHomePage> {
                 Text(
                   "Home",
                   style: TextStyle(
-                    fontSize: 12, 
-                    color: Theme.of(context).colorScheme.primary, 
-                    fontWeight: FontWeight.w600
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -720,9 +863,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     IconButton(
                       onPressed: () {
                         // Clear notifications when visiting community
-                        setState(() {
-                          _notificationCount = 0;
-                        });
+                        homeViewModel.clearNotifications();
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -730,15 +871,22 @@ class _MyHomePageState extends State<MyHomePage> {
                           ),
                         );
                       },
-                      icon: Icon(Icons.group, size: 26, color: Colors.grey.shade600),
+                      icon: Icon(
+                        Icons.group,
+                        size: 26,
+                        color: Colors.grey.shade600,
+                      ),
                     ),
                     // Simple notification badge - like in your image
-                    if (_notificationCount > 0)
+                    if (homeViewModel.notificationCount > 0)
                       Positioned(
                         right: 8,
                         top: 8,
                         child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.red,
                             borderRadius: BorderRadius.circular(12),
@@ -748,7 +896,9 @@ class _MyHomePageState extends State<MyHomePage> {
                             minHeight: 20,
                           ),
                           child: Text(
-                            _notificationCount > 99 ? '99+' : _notificationCount.toString(),
+                            homeViewModel.notificationCount > 99
+                                ? '99+'
+                                : homeViewModel.notificationCount.toString(),
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 12,
@@ -763,16 +913,18 @@ class _MyHomePageState extends State<MyHomePage> {
                 Text(
                   "Community",
                   style: TextStyle(
-                    fontSize: 12, 
-                    color: Colors.grey.shade600, 
-                    fontWeight: FontWeight.w600
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
-          ],
+            ],
+          ),
         ),
-      ),
+        );
+      },
     );
   }
 }

@@ -7,6 +7,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:vidhatasharnam/data/datasources/camera/camera_service.dart';
 
 import 'package:vidhatasharnam/core/logger/app_logger.dart';
+import 'package:vidhatasharnam/presentation/user/user_view_model.dart';
+import 'package:vidhatasharnam/presentation/visits/new_visit_view_model.dart';
+import 'package:provider/provider.dart';
+import 'package:vidhatasharnam/core/exceptions/app_exception.dart';
 
 
 class NewVisitScreen extends StatefulWidget {
@@ -27,16 +31,14 @@ class _NewVisitScreenState extends State<NewVisitScreen> {
   final TextEditingController _locationController = TextEditingController();
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _timeController = TextEditingController();
-  
-  String? _photoUrl;
-  bool _isLoadingLocation = false;
-  bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
     _initializeDateTime();
-    _getCurrentLocation();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<NewVisitViewModel>().getCurrentLocation();
+    });
   }
 
   @override
@@ -59,28 +61,12 @@ class _NewVisitScreenState extends State<NewVisitScreen> {
     _timeController.text = "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
   }
 
-  Future<void> _getCurrentLocation() async {
-    setState(() {
-      _isLoadingLocation = true;
-      _locationController.text = 'Automatically detecting your current location...';
-    });
-
-    try {
-      // Check current permission status
-      var locationPermission = await Permission.location.status;
-      
-      // If denied, request permission
-      if (locationPermission.isDenied) {
-        locationPermission = await Permission.location.request();
-      }
-      
-      // If permanently denied, show dialog to open settings
-      if (locationPermission.isPermanentlyDenied) {
-        setState(() {
-          _isLoadingLocation = false;
-          _locationController.text = '';
-        });
-        
+  Future<void> _getCurrentLocation(NewVisitViewModel viewModel) async {
+    await viewModel.getCurrentLocation();
+    
+    // Handle permission dialog if needed
+    if (viewModel.errorMessage != null && viewModel.errorMessage!.contains('permanently denied')) {
+      if (mounted) {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
@@ -103,112 +89,11 @@ class _NewVisitScreenState extends State<NewVisitScreen> {
             ],
           ),
         );
-        return;
       }
-      
-      // If still not granted, show error
-      if (!locationPermission.isGranted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location permission is required for accurate location detection')),
-        );
-        setState(() {
-          _isLoadingLocation = false;
-          _locationController.text = '';
-        });
-        return;
-      }
-
-      // Check if location services are enabled
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please enable location services')),
-        );
-        setState(() {
-          _isLoadingLocation = false;
-          _locationController.text = '';
-        });
-        return;
-      }
-
-      // Get current position with high accuracy
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: Duration(seconds: 10),
-      );
-
-      // Get detailed address from coordinates
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude, 
-        position.longitude,
-      );
-
-      if (placemarks.isNotEmpty) {
-        Placemark place = placemarks[0];
-        String address = '';
-        
-        // Build detailed address
-        if (place.subThoroughfare != null && place.subThoroughfare!.isNotEmpty) {
-          address += '${place.subThoroughfare} ';
-        }
-        if (place.thoroughfare != null && place.thoroughfare!.isNotEmpty) {
-          address += '${place.thoroughfare}, ';
-        }
-        if (place.subLocality != null && place.subLocality!.isNotEmpty) {
-          address += '${place.subLocality}, ';
-        }
-        if (place.locality != null && place.locality!.isNotEmpty) {
-          address += '${place.locality}, ';
-        }
-        if (place.subAdministrativeArea != null && place.subAdministrativeArea!.isNotEmpty) {
-          address += '${place.subAdministrativeArea}, ';
-        }
-        if (place.administrativeArea != null && place.administrativeArea!.isNotEmpty) {
-          address += '${place.administrativeArea}, ';
-        }
-        if (place.postalCode != null && place.postalCode!.isNotEmpty) {
-          address += '${place.postalCode}, ';
-        }
-        if (place.country != null && place.country!.isNotEmpty) {
-          address += place.country!;
-        }
-        
-        // Remove trailing comma and space
-        if (address.endsWith(', ')) {
-          address = address.substring(0, address.length - 2);
-        }
-        
-        // Add coordinates for precision
-        String preciseLocation = '$address\n(${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)})';
-        
-        setState(() {
-          _locationController.text = preciseLocation;
-          _isLoadingLocation = false;
-        });
-        
-        AppLogger.info('Precise location detected: $preciseLocation');
-        AppLogger.info('Location accuracy: ${position.accuracy} meters');
-      }
-    } catch (e, stackTrace) {
-      AppLogger.error(
-        'Error getting precise location',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      setState(() {
-        _isLoadingLocation = false;
-        _locationController.text = '';
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to get precise location. Please check your GPS and internet connection.'),
-          duration: Duration(seconds: 3),
-        ),
-      );
     }
   }
 
-  Future<void> _takePicture() async {
+  Future<void> _takePicture(NewVisitViewModel viewModel) async {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -228,9 +113,7 @@ class _NewVisitScreenState extends State<NewVisitScreen> {
             userId: currentUser.uid,
             visitId: tempVisitId,
             onPhotoTaken: (photoUrl) {
-              setState(() {
-                _photoUrl = photoUrl;
-              });
+              viewModel.setPhotoUrl(photoUrl);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Photo captured successfully!'),
@@ -253,9 +136,31 @@ class _NewVisitScreenState extends State<NewVisitScreen> {
     }
   }
 
-  Future<void> _submitForm() async {
-  if (_formKey.currentState!.validate()) {
+  Future<void> _submitForm(NewVisitViewModel viewModel, UserViewModel userViewModel) async {
+    if (!_formKey.currentState!.validate()) return;
+
     try {
+      // Service-level check: Verify user is still active before creating visit
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) {
+        throw const UnauthorizedException('Not authenticated. Please log in again.');
+      }
+
+      // Check via UserViewModel first (real-time check)
+      if (!userViewModel.isActive) {
+        AppLogger.warning('[NewVisitScreen] Visit creation blocked: User is inactive');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Your account has been disabled by admin. Please contact support.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+        return;
+      }
+
       // Prepare datetime from date & time controllers
       final now = DateTime.now();
       final selectedDateTime = DateTime(
@@ -266,123 +171,126 @@ class _NewVisitScreenState extends State<NewVisitScreen> {
         int.parse(_timeController.text.split(":")[1]),
       );
 
-      setState(() {
-        _isSubmitting = true;
-      });
-
-      // Save visit to Firestore
-      await FirebaseFirestore.instance.collection('visits').add({
-        'userId': FirebaseAuth.instance.currentUser!.uid,
-        'associateName': _associateNameController.text.trim(),
-        'customerName': _customerNameController.text.trim(),
-        'upperlineName': _upperlineNameController.text.trim(),
-        'teamleaderName': _teamleaderNameController.text.trim(),
-        'reraNumber': _reraNumberController.text.trim(),
-        'schemeName': _schemeNameController.text.trim(),
-        'location': _locationController.text.trim(),
-        'photoUrl': _photoUrl ?? "", // Include photo URL if available
-        'dateTime': Timestamp.fromDate(selectedDateTime),
-        'status': "Pending",
-        'scheme': null, // Keep for backward compatibility
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Visit submitted successfully!'),
-          backgroundColor: Colors.green,
-        ),
+      // Save visit to Firestore via ViewModel
+      AppLogger.info('[NewVisitScreen] Creating visit for user: $uid');
+      final success = await viewModel.submitVisit(
+        associateName: _associateNameController.text.trim(),
+        customerName: _customerNameController.text.trim(),
+        upperlineName: _upperlineNameController.text.trim(),
+        teamleaderName: _teamleaderNameController.text.trim(),
+        reraNumber: _reraNumberController.text.trim(),
+        schemeName: _schemeNameController.text.trim(),
+        dateTime: selectedDateTime,
       );
 
-      Navigator.pop(context);
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Visit submitted successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(viewModel.errorMessage ?? 'Failed to submit visit. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } catch (e, stackTrace) {
       AppLogger.error(
         'Error submitting visit data',
         error: e,
         stackTrace: stackTrace,
       );
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to submit visit. Please try again.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
       if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to submit visit. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
-}
 
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('New Visit'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Camera preview or photo
-              Container(
-                height: 200,
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: _photoUrl != null
-                    ? Container(
-                        width: double.infinity,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          color: Colors.green[50],
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.green),
-                        ),
-                        child: Stack(
-                          children: [
-                            const Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.check_circle, size: 50, color: Colors.green),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    'Photo captured successfully',
-                                    style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: CircleAvatar(
-                                backgroundColor: Colors.red,
-                                radius: 15,
-                                child: IconButton(
-                                  icon: const Icon(Icons.close, size: 15, color: Colors.white),
-                                  onPressed: () {
-                                    setState(() {
-                                      _photoUrl = null;
-                                    });
-                                  },
+    return Consumer2<NewVisitViewModel, UserViewModel>(
+      builder: (context, viewModel, userViewModel, _) {
+        // Update location controller when ViewModel location changes
+        if (viewModel.location.isNotEmpty && _locationController.text != viewModel.location) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (viewModel.location.isNotEmpty) {
+              _locationController.text = viewModel.location;
+            }
+          });
+        }
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('New Visit'),
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Camera preview or photo
+                  Container(
+                    height: 200,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: viewModel.photoUrl != null
+                      ? Container(
+                          width: double.infinity,
+                          height: 200,
+                          decoration: BoxDecoration(
+                            color: Colors.green[50],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.green),
+                          ),
+                          child: Stack(
+                            children: [
+                              const Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.check_circle, size: 50, color: Colors.green),
+                                    SizedBox(height: 8),
+                                    Text(
+                                      'Photo captured successfully',
+                                      style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : InkWell(
-                        onTap: _takePicture,
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: CircleAvatar(
+                                  backgroundColor: Colors.red,
+                                  radius: 15,
+                                  child: IconButton(
+                                    icon: const Icon(Icons.close, size: 15, color: Colors.white),
+                                    onPressed: () {
+                                      viewModel.clearPhotoUrl();
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : InkWell(
+                          onTap: () => _takePicture(viewModel),
                         child: Container(
                           width: double.infinity,
                           height: 200,
@@ -500,44 +408,44 @@ class _NewVisitScreenState extends State<NewVisitScreen> {
               ),
               const SizedBox(height: 16),
               
-              // Location (Auto-detected)
-              TextFormField(
-                controller: _locationController,
-                readOnly: true,
-                decoration: InputDecoration(
-                  labelText: 'Location (Auto-detected)',
-                  border: const OutlineInputBorder(),
-                  filled: true,
-                  fillColor: Colors.grey.shade50,
-                  suffixIcon: _isLoadingLocation 
-                    ? Container(
-                        width: 20,
-                        height: 20,
-                        padding: EdgeInsets.all(12),
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Theme.of(context).colorScheme.primary,
+                  // Location (Auto-detected)
+                  TextFormField(
+                    controller: _locationController,
+                    readOnly: true,
+                    decoration: InputDecoration(
+                      labelText: 'Location (Auto-detected)',
+                      border: const OutlineInputBorder(),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      suffixIcon: viewModel.isLoadingLocation 
+                        ? Container(
+                            width: 20,
+                            height: 20,
+                            padding: EdgeInsets.all(12),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                          )
+                        : IconButton(
+                            icon: const Icon(Icons.my_location),
+                            onPressed: () => _getCurrentLocation(viewModel),
+                            tooltip: 'Refresh location',
                           ),
-                        ),
-                      )
-                    : IconButton(
-                        icon: const Icon(Icons.my_location),
-                        onPressed: _getCurrentLocation,
-                        tooltip: 'Refresh location',
-                      ),
-                  helperText: 'Location is automatically detected from your current position',
-                  helperMaxLines: 2,
-                ),
-                maxLines: 2,
-                minLines: 1,
-                validator: (value) {
-                  if (value == null || value.isEmpty || value.contains('Automatically detecting') || value == 'Detecting precise location...') {
-                    return 'Please wait for automatic location detection to complete';
-                  }
-                  return null;
-                },
-              ),
+                      helperText: 'Location is automatically detected from your current position',
+                      helperMaxLines: 2,
+                    ),
+                    maxLines: 2,
+                    minLines: 1,
+                    validator: (value) {
+                      if (value == null || value.isEmpty || value.contains('Automatically detecting') || value == 'Detecting precise location...') {
+                        return 'Please wait for automatic location detection to complete';
+                      }
+                      return null;
+                    },
+                  ),
               const SizedBox(height: 16),
               
               // Date
@@ -562,37 +470,39 @@ class _NewVisitScreenState extends State<NewVisitScreen> {
               ),
               const SizedBox(height: 24),
               
-              // Submit Button
-              ElevatedButton(
-                onPressed: _isSubmitting ? null : _submitForm,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: _isSubmitting 
-                    ? const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          ),
-                          SizedBox(width: 8),
-                          Text('Submitting...'),
-                        ],
-                      )
-                    : const Text('Submit Visit'),
+                  // Submit Button
+                  ElevatedButton(
+                    onPressed: viewModel.isSubmitting ? null : () => _submitForm(viewModel, userViewModel),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: viewModel.isSubmitting 
+                        ? const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              Text('Submitting...'),
+                            ],
+                          )
+                        : const Text('Submit Visit'),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

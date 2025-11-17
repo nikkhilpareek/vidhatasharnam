@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-
+import 'package:provider/provider.dart';
 import 'package:vidhatasharnam/core/theme/app_theme.dart';
+import 'package:vidhatasharnam/presentation/profile/profile_view_model.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);
@@ -14,54 +13,58 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   final _nameController = TextEditingController();
   final _passwordController = TextEditingController();
-  String _email = "";
 
   @override
   void initState() {
     super.initState();
-    _loadProfile();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ProfileViewModel>().loadProfile();
+    });
   }
 
-  Future<void> _loadProfile() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      _email = user.email ?? "";
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
-      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      if (doc.exists) {
-        setState(() {
-          _nameController.text = doc['name'] ?? '';
-        });
+  Future<void> _updateProfile(ProfileViewModel viewModel) async {
+    try {
+      await viewModel.updateProfile(_nameController.text.trim());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Profile updated successfully")),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: ${e.toString()}")),
+        );
       }
     }
   }
 
-  Future<void> _updateProfile() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-        'name': _nameController.text.trim(),
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Profile updated successfully")),
-      );
-    }
-  }
-
-  Future<void> _changePassword() async {
-    final user = FirebaseAuth.instance.currentUser;
+  Future<void> _changePassword(ProfileViewModel viewModel) async {
     final newPassword = _passwordController.text.trim();
+    if (newPassword.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter a password")),
+      );
+      return;
+    }
 
-    if (user != null && newPassword.isNotEmpty) {
-      try {
-        await user.updatePassword(newPassword);
-        _passwordController.clear();
-
+    try {
+      await viewModel.changePassword(newPassword);
+      _passwordController.clear();
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Password updated successfully")),
         );
-      } catch (e) {
+      }
+    } catch (e) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Error: ${e.toString()}")),
         );
@@ -71,101 +74,120 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Profile"),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            // Profile avatar
-            CircleAvatar(
-              radius: 50,
-              backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-              child: Icon(Icons.person, size: 60, color: AppTheme.iconColor),
-            ),
-            const SizedBox(height: 12),
-            
-            // Tagline
-            Text(
-              'Turning land into legacy',
-              style: TextStyle(
-                fontSize: 14,
-                fontStyle: FontStyle.italic,
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
-                letterSpacing: 0.5,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
+    return Consumer<ProfileViewModel>(
+      builder: (context, viewModel, _) {
+        if (viewModel.isLoading && _nameController.text.isEmpty) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
 
-            // Email (read-only)
-            Text(
-              _email,
-              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-            ),
-            const SizedBox(height: 30),
+        // Update controllers when data is loaded
+        if (!viewModel.isLoading && viewModel.username.isNotEmpty && _nameController.text.isEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _nameController.text = viewModel.username;
+          });
+        }
 
-            // Editable Name field
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: "Name",
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.edit),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Save button
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: _updateProfile,
-                icon: const Icon(Icons.save),
-                label: const Text(
-                  "Save Changes",
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text("Profile"),
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                // Avatar
+                CircleAvatar(
+                  radius: 50,
+                  backgroundColor:
+                  Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                  child: Icon(Icons.person, size: 60, color: AppTheme.iconColor),
                 ),
-              ),
-            ),
+                const SizedBox(height: 12),
 
-            const SizedBox(height: 40),
-            Divider(),
-            const SizedBox(height: 20),
-
-            // Change password field
-            TextField(
-              controller: _passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: "New Password",
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.lock),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton.icon(
-                onPressed: _changePassword,
-                icon: const Icon(Icons.lock_reset),
-                label: const Text(
-                  "Change Password",
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                // Tagline
+                Text(
+                  'Turning land into legacy',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontStyle: FontStyle.italic,
+                    color:
+                    Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                    letterSpacing: 0.5,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                const SizedBox(height: 20),
+
+                // Email (non-editable)
+                Text(
+                  viewModel.email,
+                  style: TextStyle(fontSize: 16, color: Colors.grey[700]),
                 ),
-              ),
+                const SizedBox(height: 30),
+
+                // Editable Name field
+                TextField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: "Name",
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.edit),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Save button
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: viewModel.isLoading ? null : () => _updateProfile(viewModel),
+                    icon: const Icon(Icons.save),
+                    label: const Text(
+                      "Save Changes",
+                      style: TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 40),
+                Divider(),
+                const SizedBox(height: 20),
+
+                // Password field
+                TextField(
+                  controller: _passwordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: "New Password",
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.lock),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Update Password button
+                SizedBox(
+                  width: double.infinity,
+                  height: 55,
+                  child: ElevatedButton.icon(
+                    onPressed: viewModel.isLoading ? null : () => _changePassword(viewModel),
+                    icon: const Icon(Icons.lock_reset),
+                    label: const Text(
+                      "Change Password",
+                      style: TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

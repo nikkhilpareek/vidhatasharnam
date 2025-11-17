@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -274,6 +276,7 @@ class _UserDetailedVisitView extends StatefulWidget {
 
 class _UserDetailedVisitViewState extends State<_UserDetailedVisitView> {
   late Map<String, dynamic> currentVisit;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _subscription;
 
   @override
   void initState() {
@@ -283,8 +286,7 @@ class _UserDetailedVisitViewState extends State<_UserDetailedVisitView> {
   }
 
   void _listenToVisitUpdates() {
-    // Listen to Firestore document changes
-    FirebaseFirestore.instance
+    _subscription = FirebaseFirestore.instance
         .collection('visits')
         .doc(widget.visitId)
         .snapshots()
@@ -296,6 +298,12 @@ class _UserDetailedVisitViewState extends State<_UserDetailedVisitView> {
         });
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -312,7 +320,8 @@ class _UserDetailedVisitViewState extends State<_UserDetailedVisitView> {
       try {
         final ts = currentVisit['createdAt'] as Timestamp;
         final dt = ts.toDate();
-        formattedDate = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}  ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+        formattedDate =
+            '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}  ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
       } catch (_) {}
     }
 

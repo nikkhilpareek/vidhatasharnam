@@ -1,10 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/config/app_constants.dart';
-import '../../domain/repositories/local_storage.dart';
 import '../../core/logger/app_logger.dart';
+import 'splash_view_model.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -31,24 +32,19 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _checkLoginStatus() async {
     try {
-      // Add minimum splash duration for better UX
-      await Future.delayed(const Duration(milliseconds: 800));
+      final viewModel = context.read<SplashViewModel>();
+      final result = await viewModel.checkLoginStatus();
 
       if (!mounted) return;
 
-      // Lightweight check: Only check if user is logged in via LocalStorageService
-      final localStorage = LocalStorageService();
-      debugPrint('[SplashScreen] Checking login status...');
-      final isLoggedIn = localStorage.getBool(AppConstants.prefIsLoggedIn) ?? false;
-      debugPrint('[SplashScreen] Login status: $isLoggedIn');
+      final isLoggedIn = result['isLoggedIn'] as bool;
+      final userRole = result['userRole'] as String;
+      final userName = result['userName'] as String;
+
+      debugPrint('[SplashScreen] Login status: $isLoggedIn, Role: $userRole');
 
       if (isLoggedIn) {
-        // Get user role to determine navigation
-        final userRole = localStorage.getString(AppConstants.prefUserRole) ?? '';
-        debugPrint('[SplashScreen] User role: $userRole');
-        
         if (userRole.toLowerCase() == 'admin') {
-          final userName = localStorage.getString(AppConstants.prefUserEmail)?.split('@')[0] ?? 'Admin';
           debugPrint('[SplashScreen] Navigating to AdminPanel as: $userName');
           Navigator.of(context).pushReplacementNamed(
             AppConstants.navigateToAdminPanel,

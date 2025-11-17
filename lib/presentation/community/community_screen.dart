@@ -1,65 +1,56 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'package:vidhatasharnam/admin/tabs/community_admin_tab.dart';
 import 'package:vidhatasharnam/data/datasources/community/community_notification_service.dart';
+import 'package:vidhatasharnam/presentation/community/community_view_model.dart';
 
-class CommunityScreen extends StatefulWidget {
+class CommunityScreen extends StatelessWidget {
   const CommunityScreen({super.key});
-  @override
-  State<CommunityScreen> createState() => _CommunityScreenState();
-}
-
-class _CommunityScreenState extends State<CommunityScreen> {
-  String? _uid;
-  bool _isAdmin = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _uid = FirebaseAuth.instance.currentUser?.uid;
-    _loadRole();
-    
-    // Mark community notifications as read when opening community screen
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      CommunityNotificationService.instance.markAsRead();
-    });
-  }
-
-  Future<void> _loadRole() async {
-    final id = _uid;
-    if (id == null) return;
-    final snap = await FirebaseFirestore.instance.collection('users').doc(id).get();
-    setState(() {
-      _isAdmin = (snap.data()?['role'] ?? '').toString().toLowerCase() == 'admin';
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
-    if (_uid == null) {
-      return const Scaffold(body: Center(child: Text('Not authenticated')));
-    }
-    final q = FirebaseFirestore.instance
-        .collection('channels')
-        .where('members', arrayContains: _uid);
+    return Consumer<CommunityViewModel>(
+      builder: (context, viewModel, _) {
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        
+        // Load role on first build
+        if (!viewModel.isLoading && !viewModel.isAdmin && uid != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            viewModel.loadRole();
+          });
+        }
+        
+        // Mark community notifications as read when opening community screen
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          CommunityNotificationService.instance.markAsRead();
+        });
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Community'),
-      ),
-      floatingActionButton: _isAdmin
-          ? FloatingActionButton(
-              onPressed: () {
-                Navigator.pushNamed(context, '/newChannel');
-              },
-              child: const Icon(Icons.add),
-            )
-          : null,
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: q.snapshots(),
-        builder: (context, snap) {
+        if (uid == null) {
+          return const Scaffold(body: Center(child: Text('Not authenticated')));
+        }
+        
+        final q = FirebaseFirestore.instance
+            .collection('channels')
+            .where('members', arrayContains: uid);
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Community'),
+          ),
+          floatingActionButton: viewModel.isAdmin
+              ? FloatingActionButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/newChannel');
+                  },
+                  child: const Icon(Icons.add),
+                )
+              : null,
+          body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: q.snapshots(),
+            builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
             return const _ChannelListSkeleton();
           }
@@ -126,7 +117,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       builder: (_) => CommunityChannelScreen(
                         channelId: d.id,
                         channelName: name,
-                        isAdmin: _isAdmin,
+                        isAdmin: viewModel.isAdmin,
                       ),
                     ),
                   );
@@ -136,16 +127,18 @@ class _CommunityScreenState extends State<CommunityScreen> {
           );
         },
       ),
+        );
+      },
     );
   }
 
-  String _initials(String s) {
+  static String _initials(String s) {
     final parts = s.trim().split(RegExp(r'\s+'));
     if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
     return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
   }
 
-  String _relativeTime(DateTime? dt) {
+  static String _relativeTime(DateTime? dt) {
     if (dt == null) return '';
     final now = DateTime.now();
     final diff = now.difference(dt);

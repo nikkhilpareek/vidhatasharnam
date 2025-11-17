@@ -1,30 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+import 'package:vidhatasharnam/presentation/visits/total_visits_view_model.dart';
 
-class TotalVisitsScreen extends StatefulWidget {
+class TotalVisitsScreen extends StatelessWidget {
   const TotalVisitsScreen({super.key});
 
-  @override
-  State<TotalVisitsScreen> createState() => _TotalVisitsScreenState();
-}
-
-class _TotalVisitsScreenState extends State<TotalVisitsScreen> {
-  String selectedFilter = 'All';
-  final List<String> filterOptions = ['All', 'Accepted', 'Rejected', 'Pending'];
+  static const List<String> filterOptions = ['All', 'Accepted', 'Rejected', 'Pending'];
 
   @override
   Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) {
-      return const Scaffold(body: Center(child: Text('Not authenticated')));
-    }
+    return Consumer<TotalVisitsViewModel>(
+      builder: (context, viewModel, _) {
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        if (uid == null) {
+          return const Scaffold(body: Center(child: Text('Not authenticated')));
+        }
 
-    final query = FirebaseFirestore.instance
-        .collection('visits')
-        .where('userId', isEqualTo: uid); // no orderBy -> no composite index
+        final query = FirebaseFirestore.instance
+            .collection('visits')
+            .where('userId', isEqualTo: uid); // no orderBy -> no composite index
 
-    return Scaffold(
+        return Scaffold(
       appBar: AppBar(
         title: const Text(
           'Total Visits',
@@ -53,7 +51,7 @@ class _TotalVisitsScreenState extends State<TotalVisitsScreen> {
           final docs = snapshot.data?.docs ?? [];
 
           // Normalize, map, and sort locally by createdAt ASC
-          final visits = docs.map(_mapVisit).toList()
+          final visits = docs.map((doc) => _mapVisit(doc)).toList()
             ..sort((a, b) {
               final ta = a['createdAt'] as DateTime?;
               final tb = b['createdAt'] as DateTime?;
@@ -67,9 +65,9 @@ class _TotalVisitsScreenState extends State<TotalVisitsScreen> {
           final pendingCount = visits.where((v) => _displayStatus(v['status']) == 'Pending').length;
 
           // Filter by selected chip (client-side)
-          final filtered = selectedFilter == 'All'
+          final filtered = viewModel.selectedFilter == 'All'
               ? visits
-              : visits.where((v) => _displayStatus(v['status']) == selectedFilter).toList();
+              : visits.where((v) => _displayStatus(v['status']) == viewModel.selectedFilter).toList();
 
           return Container(
             color: Color(0xFFFFF4E8),
@@ -88,10 +86,10 @@ class _TotalVisitsScreenState extends State<TotalVisitsScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _buildStatCard('Total', visits.length.toString(), Icons.analytics, Colors.grey.shade700),
-                          _buildStatCard('Accepted', acceptedCount.toString(), Icons.check_circle, Colors.green.shade600),
-                          _buildStatCard('Rejected', rejectedCount.toString(), Icons.cancel, Colors.red.shade600),
-                          _buildStatCard('Pending', pendingCount.toString(), Icons.access_time, Colors.orange.shade600),
+                          _buildStatCard(context, 'Total', visits.length.toString(), Icons.analytics, Colors.grey.shade700),
+                          _buildStatCard(context, 'Accepted', acceptedCount.toString(), Icons.check_circle, Colors.green.shade600),
+                          _buildStatCard(context, 'Rejected', rejectedCount.toString(), Icons.cancel, Colors.red.shade600),
+                          _buildStatCard(context, 'Pending', pendingCount.toString(), Icons.access_time, Colors.orange.shade600),
                         ],
                       ),
                     ],
@@ -115,8 +113,8 @@ class _TotalVisitsScreenState extends State<TotalVisitsScreen> {
                                 padding: const EdgeInsets.only(right: 8),
                                 child: FilterChip(
                                   label: Text(filter,style: TextStyle(color: Colors.black),),
-                                  selected: selectedFilter == filter,
-                                  onSelected: (_) => setState(() => selectedFilter = filter),
+                                  selected: viewModel.selectedFilter == filter,
+                                  onSelected: (_) => viewModel.setFilter(filter),
                                   selectedColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
                                   checkmarkColor: Theme.of(context).colorScheme.primary,
                                 ),
@@ -132,11 +130,11 @@ class _TotalVisitsScreenState extends State<TotalVisitsScreen> {
                 // List
                 Expanded(
                   child: filtered.isEmpty
-                      ? _buildEmptyState(selectedFilter)
+                      ? _buildEmptyState(context, viewModel.selectedFilter)
                       : ListView.builder(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           itemCount: filtered.length,
-                          itemBuilder: (context, i) => _buildVisitCard(filtered[i]),
+                          itemBuilder: (context, i) => _buildVisitCard(context, filtered[i]),
                         ),
                 ),
               ],
@@ -145,9 +143,11 @@ class _TotalVisitsScreenState extends State<TotalVisitsScreen> {
         },
       ),
     );
+      },
+    );
   }
 
-  Map<String, dynamic> _mapVisit(QueryDocumentSnapshot<Map<String, dynamic>> snap) {
+  static Map<String, dynamic> _mapVisit(QueryDocumentSnapshot<Map<String, dynamic>> snap) {
     final data = snap.data();
     final status = (data['status'] ?? 'Pending').toString(); // likely 'Pending' | 'Approved' | 'Rejected'
     // Resolve primary datetime
@@ -196,12 +196,12 @@ class _TotalVisitsScreenState extends State<TotalVisitsScreen> {
   }
 
   // Map stored status to display (treat 'Approved' as 'Accepted')
-  String _displayStatus(String status) {
+  static String _displayStatus(String status) {
     if (status == 'Approved') return 'Accepted';
     return status;
   }
 
-  Widget _buildStatCard(String label, String count, IconData icon, Color iconColor) {
+  static Widget _buildStatCard(BuildContext context, String label, String count, IconData icon, Color iconColor) {
     return Column(
       children: [
         Container(
@@ -216,7 +216,7 @@ class _TotalVisitsScreenState extends State<TotalVisitsScreen> {
     );
   }
 
-  Widget _buildVisitCard(Map<String, dynamic> visit) {
+  static Widget _buildVisitCard(BuildContext context, Map<String, dynamic> visit) {
     final displayStatus = _displayStatus(visit['status'] ?? 'Pending');
     final photoUrl = visit['photoUrl']?.toString();
     final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
@@ -359,7 +359,7 @@ class _TotalVisitsScreenState extends State<TotalVisitsScreen> {
     );
   }
 
-  void _showDetailedView(BuildContext context, Map<String, dynamic> visit) {
+  static void _showDetailedView(BuildContext context, Map<String, dynamic> visit) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -368,7 +368,9 @@ class _TotalVisitsScreenState extends State<TotalVisitsScreen> {
         visitData: visit,
       ),
     );
-  }  Widget _buildEmptyState(String filter) {
+  }
+
+  static Widget _buildEmptyState(BuildContext context, String filter) {
     String title;
     String subtitle;
     switch (filter) {

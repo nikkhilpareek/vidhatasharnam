@@ -25,6 +25,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isConfirmPasswordVisible = false;
   bool _isRegistering = false;
 
+  void _togglePasswordVisibility() {
+    setState(() {
+      _isPasswordVisible = !_isPasswordVisible;
+    });
+  }
+
+  void _toggleConfirmPasswordVisibility() {
+    setState(() {
+      _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+    });
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -281,9 +293,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       icon: Icon(
                         _isPasswordVisible ? Icons.visibility_off : Icons.visibility,
                       ),
-                      onPressed: () {
-                        setState(() => _isPasswordVisible = !_isPasswordVisible);
-                      },
+                      onPressed: _togglePasswordVisibility,
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -314,9 +324,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       icon: Icon(
                         _isConfirmPasswordVisible ? Icons.visibility_off : Icons.visibility,
                       ),
-                      onPressed: () {
-                        setState(() => _isConfirmPasswordVisible = !_isConfirmPasswordVisible);
-                      },
+                      onPressed: _toggleConfirmPasswordVisibility,
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),

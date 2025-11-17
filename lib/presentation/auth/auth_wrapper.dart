@@ -8,6 +8,7 @@ import 'package:vidhatasharnam/data/datasources/community/community_notification
 import 'package:vidhatasharnam/presentation/auth/login/login_screen.dart';
 import 'package:vidhatasharnam/presentation/home/my_home_page.dart';
 import 'package:vidhatasharnam/presentation/splash/splash_screen.dart';
+import 'package:vidhatasharnam/presentation/user/user_view_model.dart';
 
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
@@ -81,6 +82,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
           case AuthStatus.authenticated:
             WidgetsBinding.instance.addPostFrameCallback((_) {
               CommunityNotificationService.instance.initialize();
+              
+              // Start UserViewModel listener for real-time status updates
+              final userViewModel = context.read<UserViewModel>();
+              userViewModel.startUserListener().catchError((e) {
+                debugPrint('[AuthWrapper] Warning: Failed to start UserViewModel: $e');
+              });
             });
             
             final userData = authService.userData!;
@@ -99,6 +106,17 @@ class _AuthWrapperState extends State<AuthWrapper> {
           
           case AuthStatus.unauthenticated:
             WidgetsBinding.instance.addPostFrameCallback((_) {
+              // Stop UserViewModel listener when user logs out
+              try {
+                final userViewModel = context.read<UserViewModel>();
+                userViewModel.stopUserListener().catchError((e) {
+                  debugPrint('[AuthWrapper] Warning: Failed to stop UserViewModel: $e');
+                });
+              } catch (e) {
+                // UserViewModel might not be available yet
+                debugPrint('[AuthWrapper] Note: Could not stop UserViewModel: $e');
+              }
+              
               if (_inactiveMessage != null && mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(

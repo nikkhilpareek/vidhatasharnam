@@ -1,0 +1,93 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Helper function to check if user is active
+    function isUserActive() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.active == true;
+    }
+    
+    // Helper function to check if user owns the document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // ============================================
+    // USERS COLLECTION
+    // ============================================
+    match /users/{userId} {
+      // Users can read their own document if active
+      allow read: if isAuthenticated() && 
+                     (isOwner(userId) || isAdmin()) &&
+                     isUserActive();
+      
+      // Only admins can create/update/delete users
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+      
+      // Users can update their own name field only
+      allow update: if isAuthenticated() && 
+                       isOwner(userId) && 
+                       isUserActive() &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']);
+    }
+    
+    // ============================================
+    // VISITS COLLECTION
+    // ============================================
+    match /visits/{visitId} {
+      // Users can read their own visits, admins can read all
+      allow read: if isAuthenticated() && 
+                     isUserActive() &&
+                     (isOwner(resource.data.userId) || isAdmin());
+      
+      // Users can create their own visits
+      allow create: if isAuthenticated() && 
+                       isUserActive() &&
+                       request.resource.data.userId == request.auth.uid;
+      
+      // Only admins can update/delete visits
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // SCHEMES COLLECTION (used by admin)
+    // ============================================
+    match /schemes/{schemeId} {
+      allow read: if isAuthenticated() && isUserActive();
+      allow write: if isAdmin();
+    }
+    
+    // ============================================
+    // CHANNELS COLLECTION (community)
+    // ============================================
+    match /channels/{channelId} {
+      allow read: if isAuthenticated() && isUserActive();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // DEFAULT DENY
+    // ============================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

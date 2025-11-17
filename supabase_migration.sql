@@ -17,3 +17,6 @@ CREATE INDEX IF NOT EXISTS idx_users_isApproved ON users("isApproved");
 -- FROM information_schema.columns 
 -- WHERE table_name = 'users' AND column_name = 'isApproved';
 
+
+
+

@@ -17,6 +17,17 @@ import 'package:vidhatasharnam/data/repositories/auth_repository_impl.dart';
 import 'package:vidhatasharnam/domain/repositories/auth_repository.dart';
 import 'package:vidhatasharnam/presentation/auth/login/login_view_model.dart';
 import 'package:vidhatasharnam/presentation/auth/register/register_view_model.dart';
+import 'package:vidhatasharnam/presentation/user/user_view_model.dart';
+import 'package:vidhatasharnam/presentation/profile/profile_view_model.dart';
+import 'package:vidhatasharnam/presentation/home/home_view_model.dart';
+import 'package:vidhatasharnam/presentation/visits/new_visit_view_model.dart';
+import 'package:vidhatasharnam/presentation/visits/pending_visit_view_model.dart';
+import 'package:vidhatasharnam/presentation/visits/total_visits_view_model.dart';
+import 'package:vidhatasharnam/presentation/community/community_view_model.dart';
+import 'package:vidhatasharnam/presentation/community/new_channel_view_model.dart';
+import 'package:vidhatasharnam/presentation/admin/admin_panel_view_model.dart';
+import 'package:vidhatasharnam/presentation/admin/visits_tab_view_model.dart';
+import 'package:vidhatasharnam/presentation/splash/splash_view_model.dart';
 import 'package:vidhatasharnam/config/supabase_config.dart';
 
 // Global variable to track initialization state
@@ -245,6 +256,9 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider<AuthService>.value(value: AuthService.instance),
+        ChangeNotifierProvider<UserViewModel>(
+          create: (_) => UserViewModel(),
+        ),
         Provider<ExceptionHandler>(create: (_) => const ExceptionHandler()),
         ProxyProvider<AuthService, AuthRepository>(
           update: (_, authService, __) =>
@@ -261,6 +275,36 @@ class MyApp extends StatelessWidget {
             authRepository: context.read<AuthRepository>(),
             exceptionHandler: context.read<ExceptionHandler>(),
           ),
+        ),
+        ChangeNotifierProvider<ProfileViewModel>(
+          create: (_) => ProfileViewModel(),
+        ),
+        ChangeNotifierProvider<HomeViewModel>(
+          create: (_) => HomeViewModel(),
+        ),
+        ChangeNotifierProvider<NewVisitViewModel>(
+          create: (_) => NewVisitViewModel(),
+        ),
+        ChangeNotifierProvider<PendingVisitViewModel>(
+          create: (_) => PendingVisitViewModel(),
+        ),
+        ChangeNotifierProvider<TotalVisitsViewModel>(
+          create: (_) => TotalVisitsViewModel(),
+        ),
+        ChangeNotifierProvider<CommunityViewModel>(
+          create: (_) => CommunityViewModel(),
+        ),
+        ChangeNotifierProvider<NewChannelViewModel>(
+          create: (_) => NewChannelViewModel(),
+        ),
+        ChangeNotifierProvider<AdminPanelViewModel>(
+          create: (_) => AdminPanelViewModel(),
+        ),
+        ChangeNotifierProvider<VisitsTabViewModel>(
+          create: (_) => VisitsTabViewModel(),
+        ),
+        ChangeNotifierProvider<SplashViewModel>(
+          create: (_) => SplashViewModel(),
         ),
       ],
       child: MaterialApp(

@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 
-import '../presentation/auth/login/login_screen.dart';
 import '../core/config/app_constants.dart';
 import '../data/datasources/auth/auth_service.dart';
+import '../presentation/admin/admin_panel_view_model.dart';
 import 'tabs/dashboard_tab.dart';
 import 'tabs/users_tab.dart';
 import 'tabs/visits_tab.dart';
@@ -21,7 +22,6 @@ class AdminPanel extends StatefulWidget {
 
 class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  bool _creatingUser = false;
 
   @override
   void initState() {
@@ -35,19 +35,19 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
     super.dispose();
   }
 
-  void _showAdminPasswordChangeDialog() {
+  void _showAdminPasswordChangeDialog(AdminPanelViewModel viewModel) {
     final currentPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
     final formKey = GlobalKey<FormState>();
-    bool _currentPasswordVisible = false;
-    bool _newPasswordVisible = false;
-    bool _confirmPasswordVisible = false;
-    bool _isChangingPassword = false;
+    bool currentPasswordVisible = false;
+    bool newPasswordVisible = false;
+    bool confirmPasswordVisible = false;
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(builder: (context, setStateDialog) {
+      builder: (_) => StatefulBuilder(
+        builder: (dialogContext, setStateDialog) {
         return AlertDialog(
           title: const Text('Change Admin Password'),
           content: SizedBox(
@@ -64,15 +64,15 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
                       border: const OutlineInputBorder(),
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
-                        icon: Icon(_currentPasswordVisible ? Icons.visibility : Icons.visibility_off),
+                        icon: Icon(currentPasswordVisible ? Icons.visibility : Icons.visibility_off),
                         onPressed: () {
                           setStateDialog(() {
-                            _currentPasswordVisible = !_currentPasswordVisible;
+                            currentPasswordVisible = !currentPasswordVisible;
                           });
                         },
                       ),
                     ),
-                    obscureText: !_currentPasswordVisible,
+                    obscureText: !currentPasswordVisible,
                     validator: (v) => v == null || v.isEmpty ? 'Enter current password' : null,
                   ),
                   const SizedBox(height: 12),
@@ -83,15 +83,15 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
                       border: const OutlineInputBorder(),
                       prefixIcon: const Icon(Icons.lock),
                       suffixIcon: IconButton(
-                        icon: Icon(_newPasswordVisible ? Icons.visibility : Icons.visibility_off),
+                        icon: Icon(newPasswordVisible ? Icons.visibility : Icons.visibility_off),
                         onPressed: () {
                           setStateDialog(() {
-                            _newPasswordVisible = !_newPasswordVisible;
+                            newPasswordVisible = !newPasswordVisible;
                           });
                         },
                       ),
                     ),
-                    obscureText: !_newPasswordVisible,
+                    obscureText: !newPasswordVisible,
                     validator: (v) => v == null || v.length < 6 ? 'Use 6+ characters' : null,
                   ),
                   const SizedBox(height: 12),
@@ -102,15 +102,15 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
                       border: const OutlineInputBorder(),
                       prefixIcon: const Icon(Icons.lock_clock),
                       suffixIcon: IconButton(
-                        icon: Icon(_confirmPasswordVisible ? Icons.visibility : Icons.visibility_off),
+                        icon: Icon(confirmPasswordVisible ? Icons.visibility : Icons.visibility_off),
                         onPressed: () {
                           setStateDialog(() {
-                            _confirmPasswordVisible = !_confirmPasswordVisible;
+                            confirmPasswordVisible = !confirmPasswordVisible;
                           });
                         },
                       ),
                     ),
-                    obscureText: !_confirmPasswordVisible,
+                    obscureText: !confirmPasswordVisible,
                     validator: (v) {
                       if (v == null || v.isEmpty) return 'Confirm your password';
                       if (v != newPasswordController.text) return 'Passwords do not match';
@@ -124,14 +124,12 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
             ElevatedButton(
-              onPressed: _isChangingPassword
+              onPressed: viewModel.isChangingPassword
                   ? null
                   : () async {
                       if (!formKey.currentState!.validate()) return;
 
-                      setStateDialog(() {
-                        _isChangingPassword = true;
-                      });
+                      viewModel.setChangingPassword(true);
 
                       try {
                         final user = FirebaseAuth.instance.currentUser;
@@ -146,15 +144,14 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
                           // Update password
                           await user.updatePassword(newPasswordController.text);
 
-                          if (context.mounted) {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
+                          if (!mounted) return;
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Password changed successfully'),
                                 backgroundColor: Colors.green,
                               ),
                             );
-                          }
                         }
                       } on FirebaseAuthException catch (e) {
                         String errorMessage = 'Failed to change password';
@@ -164,36 +161,33 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
                           errorMessage = 'New password is too weak';
                         }
                         
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(errorMessage),
                               backgroundColor: Colors.red,
                             ),
                           );
-                        }
                       } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('Error: $e'),
                               backgroundColor: Colors.red,
                             ),
                           );
-                        }
                       } finally {
-                        setStateDialog(() {
-                          _isChangingPassword = false;
-                        });
+                        viewModel.setChangingPassword(false);
                       }
                     },
-              child: _isChangingPassword
+              child: viewModel.isChangingPassword
                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : const Text('Change Password'),
             ),
           ],
         );
-      }),
+        },
+      ),
     );
   }
 
@@ -244,18 +238,18 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
     );
   }
 
-  void _showCreateUserDialog() {
+  void _showCreateUserDialog(AdminPanelViewModel viewModel) {
     final usernameController = TextEditingController();
     final emailController = TextEditingController();
     final passwordController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
     String? phoneNumber;
-    bool _passwordVisible = false;
+    bool passwordVisible = false;
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(builder: (context, setStateDialog) {
+      builder: (_) => StatefulBuilder(builder: (dialogContext, setStateDialog) {
         return AlertDialog(
           title: const Text('Create New User'),
           content: SizedBox(
@@ -310,15 +304,15 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
                             border: const OutlineInputBorder(),
                             prefixIcon: const Icon(Icons.lock_outline),
                             suffixIcon: IconButton(
-                              icon: Icon(_passwordVisible ? Icons.visibility : Icons.visibility_off),
+                              icon: Icon(passwordVisible ? Icons.visibility : Icons.visibility_off),
                               onPressed: () {
                                 setStatePass(() {
-                                  _passwordVisible = !_passwordVisible;
+                                  passwordVisible = !passwordVisible;
                                 });
                               },
                             ),
                           ),
-                          obscureText: !_passwordVisible,
+                          obscureText: !passwordVisible,
                           validator: (v) => v == null || v.length < 6 ? 'Use 6+ characters' : null,
                         );
                       },
@@ -331,14 +325,13 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
             ElevatedButton(
-              onPressed: _creatingUser
+              onPressed: viewModel.isCreatingUser
                   ? null
                   : () async {
                       if (!formKey.currentState!.validate()) return;
+                      formKey.currentState!.save();
 
-                      setState(() {
-                        _creatingUser = true;
-                      });
+                      viewModel.setCreatingUser(true);
                       setStateDialog(() {});
 
                       try {
@@ -380,12 +373,11 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
                           await secondaryApp.delete();
                         } catch (_) {}
 
-                        if (context.mounted) {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('User created successfully')),
-                          );
-                        }
+                        if (!mounted) return;
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('User created successfully')),
+                        );
                       } on FirebaseAuthException catch (e) {
                         String msg = e.message ?? e.code;
                         if (e.code == 'email-already-in-use') {
@@ -399,15 +391,11 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
                       } catch (e) {
                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
                       } finally {
-                        if (mounted) {
-                          setState(() {
-                            _creatingUser = false;
-                          });
-                        }
+                        viewModel.setCreatingUser(false);
                         setStateDialog(() {});
                       }
                     },
-              child: _creatingUser
+              child: viewModel.isCreatingUser
                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : const Text('Create'),
             ),
@@ -419,7 +407,9 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return Consumer<AdminPanelViewModel>(
+      builder: (context, viewModel, _) {
+        return Scaffold(
       appBar: AppBar(
         title: const Text('Admin Panel', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
         backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.8),
@@ -472,7 +462,7 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
               title: const Text('Change Password'),
               onTap: () {
                 Navigator.pop(context); // Close drawer
-                _showAdminPasswordChangeDialog();
+                _showAdminPasswordChangeDialog(viewModel);
               },
             ),
             const Divider(),
@@ -491,14 +481,16 @@ class _AdminPanelState extends State<AdminPanel> with SingleTickerProviderStateM
         controller: _tabController,
         children: [
           DashboardTab(
-            onCreateUser: _showCreateUserDialog,
+            onCreateUser: () => _showCreateUserDialog(viewModel),
             onManageVisits: () => _tabController.animateTo(2),
           ),
-          UsersTab(onCreateUser: _showCreateUserDialog),
+          UsersTab(onCreateUser: () => _showCreateUserDialog(viewModel)),
           const VisitsTab(),
           const CommunityAdminTab(),
         ],
       ),
+        );
+      },
     );
   }
 }

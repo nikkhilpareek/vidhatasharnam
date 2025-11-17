@@ -7,6 +7,7 @@ import 'package:vidhatasharnam/core/config/app_constants.dart';
 import 'package:vidhatasharnam/data/datasources/auth/auth_service.dart';
 import 'package:vidhatasharnam/domain/repositories/local_storage.dart';
 import 'package:vidhatasharnam/presentation/auth/login/login_view_model.dart';
+import 'package:vidhatasharnam/presentation/user/user_view_model.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -22,6 +23,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _isPasswordVisible = false;
   bool _isLoggingIn = false; // Local loading state that persists until navigation
+
+  void _togglePasswordVisibility() {
+    setState(() {
+      _isPasswordVisible = !_isPasswordVisible;
+    });
+  }
 
   @override
   void dispose() {
@@ -93,6 +100,16 @@ class _LoginScreenState extends State<LoginScreen> {
         }
 
         // AuthService has already saved login state via LocalStorageService
+        // Start UserViewModel listener for real-time status updates
+        try {
+          final userViewModel = context.read<UserViewModel>();
+          await userViewModel.startUserListener();
+          debugPrint('[LoginScreen] UserViewModel started for real-time status monitoring');
+        } catch (e) {
+          debugPrint('[LoginScreen] Warning: Failed to start UserViewModel: $e');
+          // Continue with navigation even if UserViewModel fails
+        }
+
         // Now navigate based on user role
         final userData = authService.userData!;
         debugPrint('[LoginScreen] Navigating to dashboard for role: ${userData.role}');
@@ -284,11 +301,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ? Icons.visibility_off
                                 : Icons.visibility,
                           ),
-                          onPressed: () {
-                            setState(
-                              () => _isPasswordVisible = !_isPasswordVisible,
-                            );
-                          },
+                          onPressed: _togglePasswordVisibility,
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
