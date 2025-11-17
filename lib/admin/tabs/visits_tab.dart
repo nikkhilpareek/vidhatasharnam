@@ -119,21 +119,21 @@ class VisitsTab extends StatelessWidget {
                     }
 
                     final allDocs = visitsSnap.data!.docs;
-                    final countPending = allDocs
-                        .where((d) => (d['status'] ?? '') == 'Pending')
-                        .length;
-                    final countApproved = allDocs
-                        .where((d) => (d['status'] ?? '') == 'Approved')
-                        .length;
-                    final countRejected = allDocs
-                        .where((d) => (d['status'] ?? '') == 'Rejected')
-                        .length;
+                    final countPending = allDocs.where((d) => (d['status'] ?? '') == 'Pending').length;
+                    final countApproved = allDocs.where((d) => (d['status'] ?? '') == 'Approved').length;
+                    final countRejected = allDocs.where((d) => (d['status'] ?? '') == 'Rejected').length;
 
-                    viewModel.updateStatusCounts({
+                    final latestCounts = <String, int>{
                       'Pending': countPending,
                       'Approved': countApproved,
                       'Rejected': countRejected,
-                    });
+                    };
+
+                    if (!_statusCountsEqual(viewModel.statusChipCounts, latestCounts)) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        viewModel.updateStatusCounts(latestCounts);
+                      });
+                    }
 
                     Iterable<QueryDocumentSnapshot> filtered = allDocs;
                     if (viewModel.visitStatusFilter != 'All') {
@@ -425,6 +425,15 @@ void _showAssignSchemeDialog(
       );
     },
   );
+}
+
+bool _statusCountsEqual(Map<String, int> current, Map<String, int> next) {
+  if (identical(current, next)) return true;
+  if (current.length != next.length) return false;
+  for (final entry in next.entries) {
+    if (current[entry.key] != entry.value) return false;
+  }
+  return true;
 }
 
 class _CompactVisitCard extends StatelessWidget {

@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -41,6 +40,12 @@ class _MyHomePageState extends State<MyHomePage> {
     // Initialize background processes after the screen is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeBackgroundProcesses();
+
+      final homeViewModel = context.read<HomeViewModel>();
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        homeViewModel.startCommunityNotificationListener(currentUser.uid);
+      }
       
       // Ensure UserViewModel listener is started
       final userViewModel = context.read<UserViewModel>();
@@ -506,6 +511,10 @@ class _MyHomePageState extends State<MyHomePage> {
   void _performLogout() async {
     // Show loading indicator briefly
     if (!mounted) return;
+
+    final homeViewModel = context.read<HomeViewModel>();
+    homeViewModel.stopCommunityNotificationListener();
+    homeViewModel.clearNotifications();
 
     showDialog(
       context: context,
