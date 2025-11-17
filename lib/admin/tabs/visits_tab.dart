@@ -1,99 +1,89 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:vidhatasharnam/presentation/admin/visits_tab_view_model.dart';
 
-class VisitsTab extends StatefulWidget {
+class VisitsTab extends StatelessWidget {
   final String? initialFilter;
 
   const VisitsTab({super.key, this.initialFilter});
 
   @override
-  State<VisitsTab> createState() => _VisitsTabState();
-}
-
-class _VisitsTabState extends State<VisitsTab> {
-  late String _visitStatusFilter;
-  String _visitSearchQuery = '';
-  Map<String, int> _statusChipCounts = {
-    'Pending': 0,
-    'Approved': 0,
-    'Rejected': 0,
-  };
-
-  @override
-  void initState() {
-    super.initState();
-    _visitStatusFilter = widget.initialFilter ?? 'All';
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.grey.shade50,
-      child: Column(
-        children: [
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Manage Visits',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey.shade800,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  decoration: InputDecoration(
-                    hintText:
-                        'Search by username, associate, customer, RERA, scheme... ',
-                    prefixIcon: const Icon(Icons.search),
-                    filled: true,
-                    fillColor: Colors.grey.shade50,
-                    contentPadding: const EdgeInsets.symmetric(
-                      vertical: 0,
-                      horizontal: 12,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey.shade300),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey.shade300),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Theme.of(context).colorScheme.primary,
-                        width: 1.2,
+    return Consumer<VisitsTabViewModel>(
+      builder: (context, viewModel, _) {
+        // Initialize filter if needed
+        if (initialFilter != null && viewModel.visitStatusFilter == 'All') {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            viewModel.setStatusFilter(initialFilter!);
+          });
+        }
+
+        return Container(
+          color: Colors.grey.shade50,
+          child: Column(
+            children: [
+              Container(
+                color: Colors.white,
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Manage Visits',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade800,
                       ),
                     ),
-                  ),
-                  onChanged: (v) => setState(
-                    () => _visitSearchQuery = v.trim().toLowerCase(),
-                  ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      decoration: InputDecoration(
+                        hintText:
+                            'Search by username, associate, customer, RERA, scheme... ',
+                        prefixIcon: const Icon(Icons.search),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 0,
+                          horizontal: 12,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).colorScheme.primary,
+                            width: 1.2,
+                          ),
+                        ),
+                      ),
+                      onChanged: (v) => viewModel.setSearchQuery(v),
+                    ),
+                    const SizedBox(height: 12),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildStatusChip(context, viewModel, 'All'),
+                          _buildStatusChip(context, viewModel, 'Pending'),
+                          _buildStatusChip(context, viewModel, 'Approved'),
+                          _buildStatusChip(context, viewModel, 'Rejected'),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _buildStatusChip('All'),
-                      _buildStatusChip('Pending'),
-                      _buildStatusChip('Approved'),
-                      _buildStatusChip('Rejected'),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 0),
-          Expanded(
+              ),
+              const Divider(height: 0),
+              Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('users')
@@ -139,20 +129,20 @@ class _VisitsTabState extends State<VisitsTab> {
                         .where((d) => (d['status'] ?? '') == 'Rejected')
                         .length;
 
-                    _statusChipCounts = {
+                    viewModel.updateStatusCounts({
                       'Pending': countPending,
                       'Approved': countApproved,
                       'Rejected': countRejected,
-                    };
+                    });
 
                     Iterable<QueryDocumentSnapshot> filtered = allDocs;
-                    if (_visitStatusFilter != 'All') {
+                    if (viewModel.visitStatusFilter != 'All') {
                       filtered = filtered.where(
-                        (d) => (d['status'] ?? '') == _visitStatusFilter,
+                        (d) => (d['status'] ?? '') == viewModel.visitStatusFilter,
                       );
                     }
 
-                    if (_visitSearchQuery.isNotEmpty) {
+                    if (viewModel.visitSearchQuery.isNotEmpty) {
                       filtered = filtered.where((d) {
                         final data = d.data() as Map<String, dynamic>;
                         final userId = data['userId'] ?? '';
@@ -179,22 +169,40 @@ class _VisitsTabState extends State<VisitsTab> {
                         final location = (data['location'] ?? '')
                             .toString()
                             .toLowerCase();
-                        return username.contains(_visitSearchQuery) ||
-                            associate.contains(_visitSearchQuery) ||
-                            customer.contains(_visitSearchQuery) ||
-                            upperline.contains(_visitSearchQuery) ||
-                            teamleader.contains(_visitSearchQuery) ||
-                            rera.contains(_visitSearchQuery) ||
-                            schemeName.contains(_visitSearchQuery) ||
-                            location.contains(_visitSearchQuery);
+                        return username.contains(viewModel.visitSearchQuery) ||
+                            associate.contains(viewModel.visitSearchQuery) ||
+                            customer.contains(viewModel.visitSearchQuery) ||
+                            upperline.contains(viewModel.visitSearchQuery) ||
+                            teamleader.contains(viewModel.visitSearchQuery) ||
+                            rera.contains(viewModel.visitSearchQuery) ||
+                            schemeName.contains(viewModel.visitSearchQuery) ||
+                            location.contains(viewModel.visitSearchQuery);
                       });
+                    }
+
+                    Future<void> updateVisitStatus(String visitId, String newStatus) async {
+                      await FirebaseFirestore.instance
+                          .collection('visits')
+                          .doc(visitId)
+                          .update({'status': newStatus});
+                    }
+
+                    Future<void> deleteVisit(String visitId) async {
+                      await FirebaseFirestore.instance
+                          .collection('visits')
+                          .doc(visitId)
+                          .delete();
+                    }
+
+                    void showAssignSchemeDialog(String visitId, String? existingScheme) {
+                      _showAssignSchemeDialog(context, visitId, existingScheme);
                     }
 
                     final filteredList = filtered.toList();
                     if (filteredList.isEmpty) {
                       return Center(
                         child: Text(
-                          'No ${_visitStatusFilter == 'All' ? '' : _visitStatusFilter.toLowerCase()} visits match your search.',
+                          'No ${viewModel.visitStatusFilter == 'All' ? '' : viewModel.visitStatusFilter.toLowerCase()} visits match your search.',
                         ),
                       );
                     }
@@ -210,9 +218,9 @@ class _VisitsTabState extends State<VisitsTab> {
                           visitId: doc.id,
                           visit: data,
                           userNameMap: userNameMap,
-                          onDeleteVisit: _deleteVisit,
-                          onUpdateStatus: _updateVisitStatus,
-                          onAssignScheme: _showAssignSchemeDialog,
+                          onDeleteVisit: deleteVisit,
+                          onUpdateStatus: updateVisitStatus,
+                          onAssignScheme: showAssignSchemeDialog,
                         );
                       },
                     );
@@ -224,247 +232,199 @@ class _VisitsTabState extends State<VisitsTab> {
         ],
       ),
     );
-  }
-
-  Widget _buildStatusChip(String label) {
-    final isSelected = _visitStatusFilter == label;
-
-    // Customize tick color based on status
-    Color chipColor;
-    switch (label) {
-      case 'Approved':
-        chipColor = Colors.green;
-        break;
-      case 'Pending':
-        chipColor = Colors.orange;
-        break;
-      case 'Rejected':
-        chipColor = Colors.red;
-        break;
-      default:
-        chipColor = Theme.of(context).colorScheme.primary;
-    }
-
-    // Count display
-    String display = label;
-    if (label != 'All' && _statusChipCounts.containsKey(label)) {
-      display = '$label (${_statusChipCounts[label]})';
-    }
-
-    return GestureDetector(
-      onTap: () => setState(() => _visitStatusFilter = label),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        margin: const EdgeInsets.only(right: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? chipColor.withOpacity(0.15) : Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: isSelected ? chipColor : Colors.grey.shade300,
-            width: 1.2,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Tick icon only when selected
-            if (isSelected) ...[
-              Icon(
-                Icons.check_circle,
-                color: chipColor,
-                size: 18,
-              ),
-              const SizedBox(width: 6),
-            ],
-
-            // Label text
-            Text(
-              display,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                color: isSelected ? chipColor : Colors.grey.shade700,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _updateVisitStatus(String visitId, String newStatus) async {
-    await FirebaseFirestore.instance.collection('visits').doc(visitId).update({
-      'status': newStatus,
-    });
-  }
-  Future<bool> _deleteVisit(String visitId) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('visits')
-          .doc(visitId)
-          .delete();
-
-      return true;
-    } catch (e) {
-      debugPrint("❌ Failed to delete visit: $e");
-      return false;
-    }
-  }
-
-
-  void _showAssignSchemeDialog(String visitId, String? existingScheme) {
-    final schemeNameController = TextEditingController();
-    final plotNumberController = TextEditingController();
-    final clientNameController = TextEditingController();
-    final gajSoldController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        final future = FirebaseFirestore.instance
-            .collection('visits')
-            .doc(visitId)
-            .get();
-
-        return FutureBuilder<DocumentSnapshot>(
-          future: future,
-          builder: (context, snap) {
-            if (snap.hasData) {
-              final data = snap.data!.data() as Map<String, dynamic>? ?? {};
-
-              // Pre-populate fields with existing data or defaults
-              if (schemeNameController.text.isEmpty) {
-                schemeNameController.text =
-                    data['schemeName'] ??
-                    data['scheme'] ??
-                    existingScheme ??
-                    '';
-              }
-              if (plotNumberController.text.isEmpty) {
-                plotNumberController.text = (data['plotNumber'] ?? '')
-                    .toString();
-              }
-              if (clientNameController.text.isEmpty) {
-                clientNameController.text = (data['clientName'] ?? '')
-                    .toString();
-              }
-              if (gajSoldController.text.isEmpty) {
-                gajSoldController.text = (data['gajSold'] ?? '').toString();
-              }
-            }
-
-            return AlertDialog(
-              title: const Text("Assign Scheme Details"),
-              content: SizedBox(
-                width: double.maxFinite,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextField(
-                        controller: schemeNameController,
-                        decoration: const InputDecoration(
-                          labelText: "Scheme Name",
-                          border: OutlineInputBorder(),
-                          hintText: "Enter scheme name",
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: plotNumberController,
-                        decoration: const InputDecoration(
-                          labelText: "Plot Number",
-                          border: OutlineInputBorder(),
-                          hintText: "Enter plot number",
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: clientNameController,
-                        decoration: const InputDecoration(
-                          labelText: "Client Name",
-                          border: OutlineInputBorder(),
-                          hintText: "Enter client name",
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: gajSoldController,
-                        decoration: const InputDecoration(
-                          labelText: "Gaj Sold",
-                          border: OutlineInputBorder(),
-                          hintText: "Enter gaj sold",
-                        ),
-                        keyboardType: TextInputType.number,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text("Cancel"),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    final schemeName = schemeNameController.text.trim();
-                    final plotNumber = plotNumberController.text.trim();
-                    final clientName = clientNameController.text.trim();
-                    final gajSoldText = gajSoldController.text.trim();
-
-                    // Validation
-                    if (schemeName.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Please enter scheme name"),
-                        ),
-                      );
-                      return;
-                    }
-
-                    // Convert gajSold to number, default to 0 if invalid
-                    final gajSoldNumber = int.tryParse(gajSoldText) ?? 0;
-
-                    try {
-                      await FirebaseFirestore.instance
-                          .collection('visits')
-                          .doc(visitId)
-                          .update({
-                            'schemeName': schemeName,
-                            'plotNumber': plotNumber,
-                            'clientName': clientName,
-                            'gajSold': gajSoldNumber,
-                            'scheme':
-                                schemeName, // Keep for backward compatibility
-                            'updatedAt': FieldValue.serverTimestamp(),
-                          });
-
-                      if (!context.mounted) return;
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Scheme details updated successfully"),
-                        ),
-                      );
-                    } catch (e) {
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text("Error updating scheme details: $e"),
-                        ),
-                      );
-                    }
-                  },
-                  child: const Text("Save"),
-                ),
-              ],
-            );
-          },
-        );
       },
     );
   }
+}
+
+Widget _buildStatusChip(BuildContext context, VisitsTabViewModel viewModel, String label) {
+  final isSelected = viewModel.visitStatusFilter == label;
+
+  Color chipColor;
+  switch (label) {
+    case 'Approved':
+      chipColor = Colors.green;
+      break;
+    case 'Pending':
+      chipColor = Colors.orange;
+      break;
+    case 'Rejected':
+      chipColor = Colors.red;
+      break;
+    default:
+      chipColor = Theme.of(context).colorScheme.primary;
+  }
+
+  String display = label;
+  if (label != 'All' && viewModel.statusChipCounts.containsKey(label)) {
+    display = '$label (${viewModel.statusChipCounts[label]})';
+  }
+
+  return GestureDetector(
+    onTap: () => viewModel.setStatusFilter(label),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      margin: const EdgeInsets.only(right: 8),
+      decoration: BoxDecoration(
+        color: isSelected ? chipColor.withOpacity(0.15) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isSelected ? chipColor : Colors.grey.shade300,
+          width: 1.2,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isSelected) ...[
+            Icon(Icons.check_circle, color: chipColor, size: 18),
+            const SizedBox(width: 6),
+          ],
+          Text(
+            display,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              color: isSelected ? chipColor : Colors.grey.shade700,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+void _showAssignSchemeDialog(
+  BuildContext parentContext,
+  String visitId,
+  String? existingScheme,
+) {
+  final schemeNameController = TextEditingController();
+  final plotNumberController = TextEditingController();
+  final clientNameController = TextEditingController();
+  final gajSoldController = TextEditingController();
+
+  showDialog(
+    context: parentContext,
+    builder: (dialogContext) {
+      final future = FirebaseFirestore.instance.collection('visits').doc(visitId).get();
+
+      return FutureBuilder<DocumentSnapshot>(
+        future: future,
+        builder: (context, snap) {
+          if (snap.hasData) {
+            final data = snap.data!.data() as Map<String, dynamic>? ?? {};
+            schemeNameController.text = schemeNameController.text.isNotEmpty
+                ? schemeNameController.text
+                : (data['schemeName'] ?? data['scheme'] ?? existingScheme ?? '');
+            plotNumberController.text = plotNumberController.text.isNotEmpty
+                ? plotNumberController.text
+                : (data['plotNumber'] ?? '').toString();
+            clientNameController.text = clientNameController.text.isNotEmpty
+                ? clientNameController.text
+                : (data['clientName'] ?? '').toString();
+            gajSoldController.text = gajSoldController.text.isNotEmpty
+                ? gajSoldController.text
+                : (data['gajSold'] ?? '').toString();
+          }
+
+          return AlertDialog(
+            title: const Text("Assign Scheme Details"),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: schemeNameController,
+                      decoration: const InputDecoration(
+                        labelText: "Scheme Name",
+                        border: OutlineInputBorder(),
+                        hintText: "Enter scheme name",
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: plotNumberController,
+                      decoration: const InputDecoration(
+                        labelText: "Plot Number",
+                        border: OutlineInputBorder(),
+                        hintText: "Enter plot number",
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: clientNameController,
+                      decoration: const InputDecoration(
+                        labelText: "Client Name",
+                        border: OutlineInputBorder(),
+                        hintText: "Enter client name",
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: gajSoldController,
+                      decoration: const InputDecoration(
+                        labelText: "Gaj Sold",
+                        border: OutlineInputBorder(),
+                        hintText: "Enter gaj sold",
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text("Cancel"),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final schemeName = schemeNameController.text.trim();
+                  final plotNumber = plotNumberController.text.trim();
+                  final clientName = clientNameController.text.trim();
+                  final gajSoldText = gajSoldController.text.trim();
+
+                  if (schemeName.isEmpty) {
+                    ScaffoldMessenger.of(parentContext).showSnackBar(
+                      const SnackBar(content: Text("Please enter scheme name")),
+                    );
+                    return;
+                  }
+
+                  final gajSoldNumber = int.tryParse(gajSoldText) ?? 0;
+
+                  try {
+                    await FirebaseFirestore.instance.collection('visits').doc(visitId).update({
+                      'schemeName': schemeName,
+                      'plotNumber': plotNumber,
+                      'clientName': clientName,
+                      'gajSold': gajSoldNumber,
+                      'scheme': schemeName,
+                      'updatedAt': FieldValue.serverTimestamp(),
+                    });
+
+                    Navigator.pop(dialogContext);
+                    ScaffoldMessenger.of(parentContext).showSnackBar(
+                      const SnackBar(content: Text("Scheme details updated successfully")),
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(parentContext).showSnackBar(
+                      SnackBar(content: Text("Error updating scheme details: $e")),
+                    );
+                  }
+                },
+                child: const Text("Save"),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
 }
 
 class _CompactVisitCard extends StatelessWidget {

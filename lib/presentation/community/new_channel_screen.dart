@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+import 'package:vidhatasharnam/presentation/community/new_channel_view_model.dart';
 
 class NewChannelScreen extends StatefulWidget {
   const NewChannelScreen({super.key});
@@ -13,17 +15,12 @@ class NewChannelScreen extends StatefulWidget {
 class _NewChannelScreenState extends State<NewChannelScreen> {
   final _nameController = TextEditingController();
   final _searchController = TextEditingController();
-  final _selected = <String>{};
-  bool _loading = false;
-  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(() {
-      setState(() {
-        _searchQuery = _searchController.text.trim().toLowerCase();
-      });
+      context.read<NewChannelViewModel>().setSearchQuery(_searchController.text);
     });
   }
 
@@ -36,32 +33,34 @@ class _NewChannelScreenState extends State<NewChannelScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) {
-      return const Scaffold(body: Center(child: Text('Not authenticated')));
-    }
+    return Consumer<NewChannelViewModel>(
+      builder: (context, viewModel, _) {
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        if (uid == null) {
+          return const Scaffold(body: Center(child: Text('Not authenticated')));
+        }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("New Channel"),
-        actions: [
-          TextButton(
-            onPressed: _loading ? null : () => _create(uid),
-            child: _loading
-                ? const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.black,
-              ),
-            )
-                : const Text('Create', style: TextStyle(color: Colors.black)),
-          )
-        ],
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
-      ),
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text("New Channel"),
+            actions: [
+              TextButton(
+                onPressed: viewModel.isCreating ? null : () => _create(context, viewModel, uid),
+                child: viewModel.isCreating
+                    ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.black,
+                  ),
+                )
+                    : const Text('Create', style: TextStyle(color: Colors.black)),
+              )
+            ],
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Colors.white,
+          ),
       body: Column(
         children: [
           // Channel name field
@@ -117,7 +116,7 @@ class _NewChannelScreenState extends State<NewChannelScreen> {
                 }
 
                 // Filter logic based on search query
-                final filteredDocs = _searchQuery.isEmpty
+                final filteredDocs = viewModel.searchQuery.isEmpty
                     ? docs
                     : docs.where((doc) {
                   final data = doc.data();
@@ -126,7 +125,7 @@ class _NewChannelScreenState extends State<NewChannelScreen> {
                       doc.id)
                       .toString()
                       .toLowerCase();
-                  return name.contains(_searchQuery);
+                  return name.contains(viewModel.searchQuery);
                 }).toList();
 
                 if (filteredDocs.isEmpty) {
@@ -145,17 +144,11 @@ class _NewChannelScreenState extends State<NewChannelScreen> {
                         data['email'] ??
                         userId)
                         .toString();
-                    final selected = _selected.contains(userId);
+                    final selected = viewModel.selectedMembers.contains(userId);
                     return CheckboxListTile(
                       value: selected,
                       onChanged: (v) {
-                        setState(() {
-                          if (v == true) {
-                            _selected.add(userId);
-                          } else {
-                            _selected.remove(userId);
-                          }
-                        });
+                        viewModel.toggleMember(userId);
                       },
                       title: Text(name),
                       subtitle: Text(
@@ -171,40 +164,27 @@ class _NewChannelScreenState extends State<NewChannelScreen> {
           ),
         ],
       ),
+        );
+      },
     );
   }
 
-  Future<void> _create(String adminUid) async {
+  Future<void> _create(BuildContext context, NewChannelViewModel viewModel, String adminUid) async {
     final name = _nameController.text.trim();
-    if (name.isEmpty || _selected.isEmpty) {
+    if (name.isEmpty || viewModel.selectedMembers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Name and at least one member required')));
       return;
     }
 
-    setState(() => _loading = true);
-    try {
-      final members = _selected.toSet();
-      members.add(adminUid);
-      await FirebaseFirestore.instance.collection('channels').add({
-        'name': name,
-        'createdAt': FieldValue.serverTimestamp(),
-        'createdBy': adminUid,
-        'members': members.toList(),
-        'admins': [adminUid],
-        'lastMessagePreview': '',
-        'lastMessageAt': FieldValue.serverTimestamp(),
-        'broadcast': true,
-      });
-
-      if (mounted) Navigator.pop(context);
+    final success = await viewModel.createChannel(name, adminUid);
+    if (success && context.mounted) {
+      Navigator.pop(context);
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Channel "$name" created')));
-    } catch (e) {
+    } else if (context.mounted) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error: $e')));
-    } finally {
-      if (mounted) setState(() => _loading = false);
+          .showSnackBar(SnackBar(content: Text('Error creating channel')));
     }
   }
 }

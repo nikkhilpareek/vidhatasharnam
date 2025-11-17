@@ -24,6 +24,12 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isPasswordVisible = false;
   bool _isLoggingIn = false; // Local loading state that persists until navigation
 
+  void _togglePasswordVisibility() {
+    setState(() {
+      _isPasswordVisible = !_isPasswordVisible;
+    });
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -295,11 +301,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ? Icons.visibility_off
                                 : Icons.visibility,
                           ),
-                          onPressed: () {
-                            setState(
-                              () => _isPasswordVisible = !_isPasswordVisible,
-                            );
-                          },
+                          onPressed: _togglePasswordVisibility,
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),

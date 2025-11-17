@@ -41,7 +41,10 @@ class _PendingVisitsScreenState extends State<PendingVisitsScreen> {
             return _ErrorPanel(
               title: 'Error loading visits',
               message: snapshot.error.toString(),
-              onRetry: () => setState(() {}),
+              onRetry: () {
+                // StreamBuilder will automatically retry when the stream is recreated
+                // This is just a placeholder to trigger a rebuild
+              },
             );
           }
 

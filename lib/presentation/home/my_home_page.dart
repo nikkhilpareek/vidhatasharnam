@@ -9,6 +9,7 @@ import 'package:vidhatasharnam/data/datasources/auth/auth_service.dart';
 import 'package:vidhatasharnam/data/datasources/community/community_notification_service.dart';
 import 'package:vidhatasharnam/domain/repositories/local_storage.dart';
 import 'package:vidhatasharnam/presentation/user/user_view_model.dart';
+import 'package:vidhatasharnam/presentation/home/home_view_model.dart';
 import 'package:provider/provider.dart';
 import 'package:vidhatasharnam/presentation/about/about_us_screen.dart';
 import 'package:vidhatasharnam/presentation/auth/login/login_screen.dart';
@@ -138,8 +139,6 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  // Simple notification state
-  int _notificationCount = 12; // Hardcoded for testing - matches your image
 
   Widget _buildCardButton({
     required String title,
@@ -573,9 +572,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    // Use Consumer to reactively observe UserViewModel changes
-    return Consumer<UserViewModel>(
-      builder: (context, userViewModel, _) {
+    // Use Consumer to reactively observe UserViewModel and HomeViewModel changes
+    return Consumer2<UserViewModel, HomeViewModel>(
+      builder: (context, userViewModel, homeViewModel, _) {
         // Show snackbar when user is deactivated (only once per state change)
         if (!userViewModel.isActive && !_hasShownDeactivatedSnackBar && mounted) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -855,9 +854,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     IconButton(
                       onPressed: () {
                         // Clear notifications when visiting community
-                        setState(() {
-                          _notificationCount = 0;
-                        });
+                        homeViewModel.clearNotifications();
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -872,7 +869,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                     ),
                     // Simple notification badge - like in your image
-                    if (_notificationCount > 0)
+                    if (homeViewModel.notificationCount > 0)
                       Positioned(
                         right: 8,
                         top: 8,
@@ -890,9 +887,9 @@ class _MyHomePageState extends State<MyHomePage> {
                             minHeight: 20,
                           ),
                           child: Text(
-                            _notificationCount > 99
+                            homeViewModel.notificationCount > 99
                                 ? '99+'
-                                : _notificationCount.toString(),
+                                : homeViewModel.notificationCount.toString(),
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 12,
