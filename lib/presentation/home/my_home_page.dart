@@ -215,7 +215,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     );
                   },
                 ),
-                SizedBox(height: 8),
+                SizedBox(height: 4),
                 Text(
                   'Turning land into legacy',
                   style: TextStyle(
