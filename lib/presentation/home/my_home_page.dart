@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vidhatasharnam/core/config/app_constants.dart';
 import 'package:vidhatasharnam/core/logger/app_logger.dart';
@@ -7,13 +8,12 @@ import 'package:vidhatasharnam/core/theme/app_theme.dart';
 import 'package:vidhatasharnam/data/datasources/auth/auth_service.dart';
 import 'package:vidhatasharnam/data/datasources/community/community_notification_service.dart';
 import 'package:vidhatasharnam/domain/repositories/local_storage.dart';
-import 'package:vidhatasharnam/presentation/user/user_view_model.dart';
-import 'package:vidhatasharnam/presentation/home/home_view_model.dart';
-import 'package:provider/provider.dart';
 import 'package:vidhatasharnam/presentation/about/about_us_screen.dart';
 import 'package:vidhatasharnam/presentation/auth/login/login_screen.dart';
 import 'package:vidhatasharnam/presentation/community/community_screen.dart';
+import 'package:vidhatasharnam/presentation/home/home_view_model.dart';
 import 'package:vidhatasharnam/presentation/profile/profile_page.dart';
+import 'package:vidhatasharnam/presentation/user/user_view_model.dart';
 import 'package:vidhatasharnam/presentation/visits/new_visit.dart';
 import 'package:vidhatasharnam/presentation/visits/pending_visit.dart';
 import 'package:vidhatasharnam/presentation/visits/total_gaj_sold.dart';
@@ -46,7 +46,7 @@ class _MyHomePageState extends State<MyHomePage> {
       if (currentUser != null) {
         homeViewModel.startCommunityNotificationListener(currentUser.uid);
       }
-      
+
       // Ensure UserViewModel listener is started
       final userViewModel = context.read<UserViewModel>();
       if (!userViewModel.isListening) {
@@ -62,7 +62,7 @@ class _MyHomePageState extends State<MyHomePage> {
     if (!userViewModel.isActive) {
       return 'Deactivated';
     }
-    
+
     // Check userData from ViewModel for status field
     final userData = userViewModel.userData;
     if (userData != null) {
@@ -71,7 +71,7 @@ class _MyHomePageState extends State<MyHomePage> {
         return statusField;
       }
     }
-    
+
     return 'Active'; // Default
   }
 
@@ -144,7 +144,6 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-
   Widget _buildCardButton({
     required String title,
     required IconData icon,
@@ -179,7 +178,9 @@ class _MyHomePageState extends State<MyHomePage> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: isEnabled ? Colors.grey.shade800 : Colors.grey.shade400,
+                  color: isEnabled
+                      ? Colors.grey.shade800
+                      : Colors.grey.shade400,
                 ),
               ),
             ],
@@ -193,270 +194,122 @@ class _MyHomePageState extends State<MyHomePage> {
     return Drawer(
       child: Column(
         children: [
-          // Drawer Header with Logo
+          // Drawer Header
           Container(
-            height: 200,
+            height: 180,
             width: double.infinity,
-            decoration: BoxDecoration(color: Color(0xFFFFF4E8)),
+            decoration: const BoxDecoration(color: Color(0xFFFFF4E8)),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                SizedBox(height: 20),
+                const SizedBox(height: 10),
                 Image.asset(
                   'assets/images/logo.png',
-                  width: 170,
-                  height: 100,
+                  width: 150,
+                  height: 80,
                   fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Icon(
-                      Icons.business,
-                      size: 50,
-                      color: AppTheme.iconColor,
-                    );
-                  },
+                  errorBuilder: (_, __, ___) => Icon(Icons.business, size: 48, color: AppTheme.iconColor),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   'Turning land into legacy',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     fontStyle: FontStyle.italic,
-                    color: Colors.black.withOpacity(0.9),
-                    letterSpacing: 0.5,
+                    color: Colors.black.withOpacity(0.8),
                   ),
-                  textAlign: TextAlign.center,
                 ),
-                SizedBox(height: 10),
               ],
             ),
           ),
 
-          // Drawer Items with padding
           Expanded(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: Icon(
-                      Icons.person_outline,
-                      color: AppTheme.iconColor,
-                      size: 28,
-                    ),
-                    title: Text(
-                      'Profile',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ProfilePage(),
-                        ),
-                      );
-                    },
-                  ),
-                  ListTile(
-                    leading: Icon(
-                      Icons.delete,
-                      color: AppTheme.iconColor,
-                      size: 28,
-                    ),
-                    title: Text(
-                      'Delete Profile',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text("your profile is deleted"),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                      _performLogout();
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const LoginScreen(),
-                        ),
-                      );
-                    },
-                  ),
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _drawerItem(
+                  icon: Icons.person_outline,
+                  title: "Profile",
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage()));
+                  },
+                ),
+                _divider(),
 
-                  SizedBox(height: 10),
+                _drawerItem(
+                  icon: Icons.delete_outline,
+                  title: "Delete Profile",
+                  titleColor: Colors.red,
+                  iconColor: Colors.red,
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Your profile has been deleted"),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    _performLogout();
+                    Navigator.pop(context);
+                    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+                  },
+                ),
+                _divider(),
 
-                  ExpansionTile(
-                    leading: Icon(
-                      Icons.business_outlined,
-                      color: AppTheme.iconColor,
-                      size: 28,
-                    ),
-                    title: Text(
-                      'Our Projects',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    children: [
-                      ListTile(
-                        leading: Icon(
-                          Icons.web,
-                          color: AppTheme.iconColor,
-                          size: 24,
-                        ),
-                        title: Text(
-                          'View More Projects',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                        onTap: () async {
-                          Navigator.pop(context);
-                          try {
-                            final url = Uri.parse(
-                              'https://vidhatasharanam.com',
-                            );
-                            await launchUrl(
-                              url,
-                              mode: LaunchMode.externalApplication,
-                            );
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Could not open website: $e'),
-                                ),
-                              );
-                            }
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 10),
+                _drawerItem(
+                  icon: Icons.web,
+                  title: "View More Projects",
+                  onTap: () async {
+                    Navigator.pop(context);
+                    final url = Uri.parse('https://vidhatasharanam.com');
+                    await launchUrl(url, mode: LaunchMode.externalApplication);
+                  },
+                ),
+                _divider(),
 
-                  // Contact Us Section
-                  ExpansionTile(
-                    leading: Icon(
-                      Icons.contact_support_outlined,
-                      color: AppTheme.iconColor,
-                      size: 28,
-                    ),
-                    title: Text(
-                      'Contact Us',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    children: [
-                      ListTile(
-                        leading: Icon(
-                          Icons.email_outlined,
-                          color: AppTheme.iconColor,
-                          size: 20,
-                        ),
-                        title: Text(
-                          'vidhatasharanam@gmail.com',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                        onTap: () async {
-                          Navigator.pop(context);
-                          try {
-                            final url = Uri.parse(
-                              'mailto:vidhatasharanam@gmail.com',
-                            );
-                            await launchUrl(url);
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Could not open email app: $e'),
-                                ),
-                              );
-                            }
-                          }
-                        },
-                      ),
-                      ListTile(
-                        leading: Icon(
-                          Icons.phone_outlined,
-                          color: AppTheme.iconColor,
-                          size: 20,
-                        ),
-                        title: Text(
-                          '+91-9460067878',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                        onTap: () async {
-                          Navigator.pop(context);
-                          try {
-                            final url = Uri.parse('tel:+919460067878');
-                            await launchUrl(url);
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Could not open phone app: $e'),
-                                ),
-                              );
-                            }
-                          }
-                        },
-                      ),
-                    ],
-                  ),
+                _drawerItem(
+                  icon: Icons.email_outlined,
+                  title: "vidhatasharanam@gmail.com",
+                  iconSize: 20,
+                  fontSize: 14,
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await launchUrl(Uri.parse('mailto:vidhatasharanam@gmail.com'));
+                  },
+                ),
+                _divider(),
 
-                  ListTile(
-                    leading: Icon(
-                      Icons.info_outline,
-                      color: AppTheme.iconColor,
-                      size: 28,
-                    ),
-                    title: Text(
-                      'About Us',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const AboutUsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
+                _drawerItem(
+                  icon: Icons.phone_outlined,
+                  title: "+91-9460067878",
+                  iconSize: 20,
+                  fontSize: 14,
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await launchUrl(Uri.parse('tel:+919460067878'));
+                  },
+                ),
+                _divider(),
+
+                _drawerItem(
+                  icon: Icons.info_outline,
+                  title: "About Us",
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutUsScreen()));
+                  },
+                ),
+                _divider(),
+              ],
             ),
           ),
 
-          // Logout Button at Bottom
-          Container(
-            padding: EdgeInsets.all(20),
+          // Logout Button
+          Padding(
+            padding: const EdgeInsets.all(20),
             child: SizedBox(
               width: double.infinity,
-              height: 50,
+              height: 48,
               child: ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
@@ -465,19 +318,43 @@ class _MyHomePageState extends State<MyHomePage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: Text(
+                child: const Text(
                   'LOG OUT',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _drawerItem({
+    required IconData icon,
+    required String title,
+    double iconSize = 26,
+    double fontSize = 15,
+    Color? iconColor,
+    Color? titleColor,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Icon(icon, size: iconSize, color: iconColor ?? AppTheme.iconColor),
+      title: Text(
+        title,
+        style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w500, color: titleColor ?? Colors.black),
+      ),
+      onTap: onTap,
+    );
+  }
+
+  Widget _divider() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Divider(color: Colors.grey.shade300, height: 1),
     );
   }
 
@@ -599,57 +476,54 @@ class _MyHomePageState extends State<MyHomePage> {
             }
           });
         }
-        
+
         // Reset flag when user becomes active again
         if (userViewModel.isActive && _hasShownDeactivatedSnackBar) {
           _hasShownDeactivatedSnackBar = false;
         }
 
         // Determine background color based on active status
-        final backgroundColor = userViewModel.isActive 
-            ? Colors.grey.shade50  // Normal background
-            : Colors.red.shade50.withOpacity(0.3);  // Red tint when deactivated
+        final backgroundColor = userViewModel.isActive
+            ? Colors
+                  .grey
+                  .shade50 // Normal background
+            : Colors.red.shade50.withOpacity(0.3); // Red tint when deactivated
 
         return Scaffold(
           key: _scaffoldKey,
           backgroundColor: backgroundColor,
           appBar: AppBar(
+            backgroundColor: const Color(0xFFF18F3B), // your orange color
+            elevation: 2,
             title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Text(
                   widget.title,
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
-                    fontSize: 24,
-                    color: Colors.black, // Black for main heading
+                    fontSize: 20,
+                    color: Colors.black,
+                    letterSpacing: 0.3,
                   ),
                 ),
-                const Text(
+                const SizedBox(height: 2), // subtle spacing
+                Text(
                   "Turning land into legacy",
                   style: TextStyle(
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
-                    color: Colors.black54,
-                    // Lighter black for subheading
-                    letterSpacing: 0.3,
-                    fontWeight: FontWeight.normal,
+                    fontSize: 12.5,
+                    height: 1.1,
+                    letterSpacing: 0.2,
+                    color: Colors.black.withOpacity(0.75),
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
               ],
             ),
-            actions: <Widget>[
-              IconButton(
-                onPressed: () {
-                  _scaffoldKey.currentState?.openEndDrawer();
-                },
-                icon: const Icon(Icons.menu),
-              ),
-              const SizedBox(width: 16),
-            ],
+            centerTitle: true,
           ),
-          endDrawer: _buildDrawer(),
+          drawer: _buildDrawer(),
           // Floating Action Button - hidden when user is inactive
           floatingActionButton: userViewModel.isActive
               ? FloatingActionButton.large(
@@ -666,8 +540,10 @@ class _MyHomePageState extends State<MyHomePage> {
                   shape: const CircleBorder(),
                   child: const Icon(Icons.add, size: 35),
                 )
-              : null, // Hide FAB when inactive
-          floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+              : null,
+          // Hide FAB when inactive
+          floatingActionButtonLocation:
+              FloatingActionButtonLocation.centerDocked,
           body: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -709,7 +585,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     // USERNAME TEXT
                     Text(
                       "Welcome back, ${userViewModel.userName ?? 'User'}!",
-                      style:  TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: Theme.of(context).colorScheme.primary,
@@ -764,21 +640,23 @@ class _MyHomePageState extends State<MyHomePage> {
                         icon: Icons.add_circle_outline_rounded,
                         onTap: userViewModel.isActive
                             ? () {
-                          if (userViewModel.isActive) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => NewVisitScreen(),
-                              ),
-                            );
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text("Your Profile is Disable by Admin!! Please Contact"),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
+                                if (userViewModel.isActive) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => NewVisitScreen(),
+                                    ),
+                                  );
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        "Your Profile is Disable by Admin!! Please Contact",
+                                      ),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
                               }
                             : null, // Disabled when inactive
                         isEnabled: userViewModel.isActive,
@@ -828,101 +706,106 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
           bottomNavigationBar: BottomAppBar(
             shape: const CircularNotchedRectangle(),
-        notchMargin: 10,
-        height: 100,
-        color: Colors.white,
-        elevation: 5,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+            notchMargin: 10,
+            height: 100,
+            color: Colors.white,
+            elevation: 5,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                IconButton(
-                  onPressed: () {
-                    AppLogger.debug('Home tab tapped');
-                  },
-                  icon: Icon(Icons.home, size: 26, color: AppTheme.iconColor),
-                ),
-                Text(
-                  "Home",
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(width: 50), // Space for larger FAB
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Stack(
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     IconButton(
                       onPressed: () {
-                        // Clear notifications when visiting community
-                        homeViewModel.clearNotifications();
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => CommunityScreen(),
-                          ),
-                        );
+                        AppLogger.debug('Home tab tapped');
                       },
                       icon: Icon(
-                        Icons.group,
+                        Icons.home,
                         size: 26,
-                        color: Colors.grey.shade600,
+                        color: AppTheme.iconColor,
                       ),
                     ),
-                    // Simple notification badge - like in your image
-                    if (homeViewModel.notificationCount > 0)
-                      Positioned(
-                        right: 8,
-                        top: 8,
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          constraints: BoxConstraints(
-                            minWidth: 20,
-                            minHeight: 20,
-                          ),
-                          child: Text(
-                            homeViewModel.notificationCount > 99
-                                ? '99+'
-                                : homeViewModel.notificationCount.toString(),
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
+                    Text(
+                      "Home",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w600,
                       ),
+                    ),
                   ],
                 ),
-                Text(
-                  "Community",
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w600,
-                  ),
+                SizedBox(width: 50), // Space for larger FAB
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Stack(
+                      children: [
+                        IconButton(
+                          onPressed: () {
+                            // Clear notifications when visiting community
+                            homeViewModel.clearNotifications();
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => CommunityScreen(),
+                              ),
+                            );
+                          },
+                          icon: Icon(
+                            Icons.group,
+                            size: 26,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        // Simple notification badge - like in your image
+                        if (homeViewModel.notificationCount > 0)
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              constraints: BoxConstraints(
+                                minWidth: 20,
+                                minHeight: 20,
+                              ),
+                              child: Text(
+                                homeViewModel.notificationCount > 99
+                                    ? '99+'
+                                    : homeViewModel.notificationCount
+                                          .toString(),
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    Text(
+                      "Community",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-            ],
           ),
-        ),
         );
       },
     );
